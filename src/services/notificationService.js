@@ -1,19 +1,30 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { formatCurrency } from '../utils/currencyUtils';
 import { PAYMENT_STATUSES } from '../utils/constants';
 
-// Configure notification behavior
-try {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
-  });
-} catch (e) {
-  // Gracefully handle in environments where notifications are stubbed
+function getNotificationsModule() {
+  try {
+    return require('expo-notifications');
+  } catch (err) {
+    console.warn('[notificationService] expo-notifications is not available in this runtime:', err?.message);
+    return null;
+  }
+}
+
+// Safely configure notification behavior if available
+const Notifications = getNotificationsModule();
+if (Notifications && typeof Notifications.setNotificationHandler === 'function') {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  } catch (e) {
+    // Gracefully handle in environments where notifications are stubbed
+  }
 }
 
 export const notificationService = {
@@ -22,13 +33,15 @@ export const notificationService = {
    */
   async requestPermissions() {
     if (Platform.OS === 'web') return false;
+    const notif = getNotificationsModule();
+    if (!notif) return false;
 
     try {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      const { status: existingStatus } = await notif.getPermissionsAsync();
       let finalStatus = existingStatus;
 
       if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
+        const { status } = await notif.requestPermissionsAsync();
         finalStatus = status;
       }
 
@@ -37,10 +50,10 @@ export const notificationService = {
         return false;
       }
 
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('policy-reminders', {
+      if (Platform.OS === 'android' && typeof notif.setNotificationChannelAsync === 'function') {
+        await notif.setNotificationChannelAsync('policy-reminders', {
           name: 'Policy Reminders',
-          importance: Notifications.AndroidImportance.HIGH,
+          importance: notif.AndroidImportance?.HIGH || 4,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#2563EB',
         });
@@ -63,6 +76,9 @@ export const notificationService = {
     if (Platform.OS === 'web') return;
     if (!payment || payment.status === PAYMENT_STATUSES.PAID) return;
     if (policy && policy.reminderEnabled === false) return;
+
+    const notif = getNotificationsModule();
+    if (!notif || typeof notif.scheduleNotificationAsync !== 'function') return;
 
     try {
       const dueDate = new Date(payment.dueDate);
@@ -90,7 +106,7 @@ export const notificationService = {
           const daysText = daysBefore === 0 ? 'today' : daysBefore === 1 ? 'tomorrow' : `in ${daysBefore} days`;
           const body = `Your ${policyName} premium of ${amountStr} is due ${daysText}.`;
 
-          await Notifications.scheduleNotificationAsync({
+          await notif.scheduleNotificationAsync({
             content: {
               title: 'Premium Payment Reminder',
               body,
@@ -112,11 +128,14 @@ export const notificationService = {
    */
   async cancelPaymentReminder(paymentId) {
     if (Platform.OS === 'web' || !paymentId) return;
+    const notif = getNotificationsModule();
+    if (!notif || typeof notif.getAllScheduledNotificationsAsync !== 'function') return;
+
     try {
-      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-      for (const notif of scheduled) {
-        if (notif.identifier && notif.identifier.startsWith(`payment_${paymentId}`)) {
-          await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+      const scheduled = await notif.getAllScheduledNotificationsAsync();
+      for (const item of scheduled) {
+        if (item.identifier && item.identifier.startsWith(`payment_${paymentId}`)) {
+          await notif.cancelScheduledNotificationAsync(item.identifier);
         }
       }
     } catch (err) {
@@ -129,8 +148,11 @@ export const notificationService = {
    */
   async cancelAllReminders() {
     if (Platform.OS === 'web') return;
+    const notif = getNotificationsModule();
+    if (!notif || typeof notif.cancelAllScheduledNotificationsAsync !== 'function') return;
+
     try {
-      await Notifications.cancelAllScheduledNotificationsAsync();
+      await notif.cancelAllScheduledNotificationsAsync();
     } catch (err) {
       console.warn('[notificationService] Error canceling all notifications:', err);
     }

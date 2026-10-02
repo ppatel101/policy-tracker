@@ -153,23 +153,31 @@ export const DashboardScreen = ({ navigation }) => {
             <StatCard
               title="Total Due"
               value={formatCurrency(stats.totalPremiumDue)}
-              subtitle="Across all policies"
+              subtitle={`${stats.financialYear?.label || 'FY'} pending`}
               icon={<Ionicons name="cash-outline" size={18} color={colors.danger} />}
               iconBgColor={colors.dangerLight}
             />
             <StatCard
               title="Paid This Year"
               value={formatCurrency(stats.paidThisYear)}
-              subtitle={`${new Date().getFullYear()} contributions`}
+              subtitle={`${stats.financialYear?.label || 'FY'} paid`}
               icon={<Ionicons name="checkmark-done" size={18} color={colors.success} />}
               iconBgColor={colors.successLight}
             />
           </View>
         </View>
 
-        {/* Upcoming Payments Section (Sections 19, 20, 21) */}
+        {/* Upcoming Payments Section (Financial Year 1 Apr - 31 Mar) */}
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Upcoming Payments</Text>
+          <View style={styles.sectionTitleArea}>
+            <Text style={styles.sectionTitle}>Upcoming Payments</Text>
+            <View style={styles.fyBadge}>
+              <Ionicons name="calendar-outline" size={12} color={colors.primary} />
+              <Text style={styles.fyBadgeText}>
+                {stats.financialYear?.label} ({stats.financialYear?.displayRange})
+              </Text>
+            </View>
+          </View>
           {upcomingPayments.length > 0 && (
             <TouchableOpacity
               activeOpacity={0.7}
@@ -184,9 +192,14 @@ export const DashboardScreen = ({ navigation }) => {
           <View style={styles.emptyContainer}>
             <EmptyState
               icon="calendar-outline"
-              title="No upcoming payments"
-              description="You have no pending premiums due at this time."
+              title={`No dues in ${stats.financialYear?.label || 'current FY'}`}
+              description={`No pending premiums found for the period ${stats.financialYear?.displayRange || '1 Apr - 31 Mar'}.`}
               buttonTitle={policies.length === 0 ? 'Add Your First Policy' : null}
+              buttonIcon={
+                policies.length === 0 ? (
+                  <Ionicons name="add-circle-outline" size={18} color={colors.textInverse} />
+                ) : null
+              }
               onButtonPress={() => navigation.navigate('AddPolicy')}
             />
           </View>
@@ -205,26 +218,6 @@ export const DashboardScreen = ({ navigation }) => {
               />
             ))}
           </View>
-        )}
-
-        {/* Quick Add Banner if no policies */}
-        {policies.length === 0 && (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('AddPolicy')}
-            style={styles.addPolicyBanner}
-          >
-            <View style={styles.bannerIconCircle}>
-              <Ionicons name="shield-outline" size={26} color={colors.primary} />
-            </View>
-            <View style={styles.bannerTextArea}>
-              <Text style={styles.bannerTitle}>Track an Insurance Policy</Text>
-              <Text style={styles.bannerSubtitle}>
-                Add life, health, vehicle, or term insurance to schedule reminders.
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.primary} />
-          </TouchableOpacity>
         )}
       </ScrollView>
 
@@ -317,7 +310,26 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...typography.h3,
     color: colors.textPrimary,
-    marginBottom: spacing.md,
+  },
+  sectionTitleArea: {
+    flex: 1,
+    paddingRight: spacing.sm,
+  },
+  fyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  fyBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.primaryDark,
   },
   statsRow: {
     flexDirection: 'row',
@@ -327,13 +339,14 @@ const styles = StyleSheet.create({
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: spacing.md,
   },
   seeAllText: {
     ...typography.bodyBold,
     color: colors.primary,
     fontSize: 13,
+    marginTop: 4,
   },
   paymentsList: {
     marginBottom: spacing.lg,
@@ -344,37 +357,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.lg,
-  },
-  addPolicyBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.primaryLight,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginTop: spacing.md,
-    gap: spacing.md,
-  },
-  bannerIconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bannerTextArea: {
-    flex: 1,
-  },
-  bannerTitle: {
-    ...typography.subtitle,
-    color: colors.textPrimary,
-    fontWeight: '700',
-  },
-  bannerSubtitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
   },
 });

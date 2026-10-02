@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { safeStorage } from '../storage/localStorage';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { localStorage } from '../storage/localStorage';
 import { mapPolicyToRow } from '../models/policy';
@@ -41,7 +41,7 @@ export const migrationService = {
       }
 
       // 2. Keep local backup before any alteration
-      await AsyncStorage.setItem(
+      await safeStorage.setItem(
         BACKUP_KEY,
         JSON.stringify({
           policies: localPolicies,
@@ -126,7 +126,7 @@ export const migrationService = {
    */
   async restoreFromBackup() {
     try {
-      const raw = await AsyncStorage.getItem(BACKUP_KEY);
+      const raw = await safeStorage.getItem(BACKUP_KEY);
       if (!raw) return null;
       const backup = JSON.parse(raw);
       await localStorage.setCachedPolicies(backup.policies || []);

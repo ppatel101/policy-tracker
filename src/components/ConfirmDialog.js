@@ -29,25 +29,27 @@ export const ConfirmDialog = ({
           {message ? <Text style={styles.message}>{message}</Text> : null}
 
           <View style={styles.buttonRow}>
-            <View style={styles.buttonWrapper}>
-              <Button
-                title={cancelText}
-                onPress={onCancel}
-                variant="secondary"
-                size="medium"
-                disabled={loading}
-              />
-            </View>
+            <Button
+              title={cancelText}
+              onPress={onCancel}
+              variant="secondary"
+              size="small"
+              fullWidth={false}
+              disabled={loading}
+              style={styles.dialogButton}
+              textStyle={styles.dialogButtonText}
+            />
 
-            <View style={styles.buttonWrapper}>
-              <Button
-                title={confirmText}
-                onPress={onConfirm}
-                variant={confirmVariant}
-                size="medium"
-                loading={loading}
-              />
-            </View>
+            <Button
+              title={confirmText}
+              onPress={onConfirm}
+              variant={confirmVariant}
+              size="small"
+              fullWidth={false}
+              loading={loading}
+              style={styles.dialogButton}
+              textStyle={styles.dialogButtonText}
+            />
           </View>
         </View>
       </View>
@@ -90,10 +92,20 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
     gap: spacing.md,
   },
-  buttonWrapper: {
-    flex: 1,
+  dialogButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs + 3,
+    height: 'auto',
+    minHeight: 38,
+    borderRadius: borderRadius.md,
+    alignSelf: 'center',
+  },
+  dialogButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

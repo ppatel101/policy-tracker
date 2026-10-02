@@ -1,12 +1,58 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS, CURRENT_MIGRATION_VERSION } from '../utils/constants';
 
+// In-memory fallback map in case native storage fails or is unavailable
+const memoryFallback = new Map();
+
 /**
- * Safe JSON getter from AsyncStorage
+ * Universal safe storage adapter that wraps AsyncStorage with an in-memory fallback
+ */
+export const safeStorage = {
+  async getItem(key) {
+    try {
+      const val = await AsyncStorage.getItem(key);
+      if (val !== null && val !== undefined) return val;
+      return memoryFallback.get(key) ?? null;
+    } catch (err) {
+      console.warn(`[safeStorage] AsyncStorage.getItem failed for ${key}, using memory:`, err?.message);
+      return memoryFallback.get(key) ?? null;
+    }
+  },
+
+  async setItem(key, value) {
+    memoryFallback.set(key, value);
+    try {
+      await AsyncStorage.setItem(key, value);
+    } catch (err) {
+      console.warn(`[safeStorage] AsyncStorage.setItem failed for ${key}, saved to memory:`, err?.message);
+    }
+  },
+
+  async removeItem(key) {
+    memoryFallback.delete(key);
+    try {
+      await AsyncStorage.removeItem(key);
+    } catch (err) {
+      console.warn(`[safeStorage] AsyncStorage.removeItem failed for ${key}:`, err?.message);
+    }
+  },
+
+  async multiRemove(keys = []) {
+    keys.forEach((k) => memoryFallback.delete(k));
+    try {
+      await AsyncStorage.multiRemove(keys);
+    } catch (err) {
+      console.warn('[safeStorage] AsyncStorage.multiRemove failed:', err?.message);
+    }
+  },
+};
+
+/**
+ * Safe JSON getter
  */
 async function getItemJSON(key, defaultValue = null) {
   try {
-    const raw = await AsyncStorage.getItem(key);
+    const raw = await safeStorage.getItem(key);
     return raw ? JSON.parse(raw) : defaultValue;
   } catch (err) {
     console.warn(`[localStorage] Error reading ${key}:`, err);
@@ -15,11 +61,11 @@ async function getItemJSON(key, defaultValue = null) {
 }
 
 /**
- * Safe JSON setter for AsyncStorage
+ * Safe JSON setter
  */
 async function setItemJSON(key, value) {
   try {
-    await AsyncStorage.setItem(key, JSON.stringify(value));
+    await safeStorage.setItem(key, JSON.stringify(value));
   } catch (err) {
     console.warn(`[localStorage] Error writing ${key}:`, err);
   }
@@ -52,10 +98,10 @@ export const localStorage = {
 
   // Last sync timestamp
   async getLastSyncTime() {
-    return AsyncStorage.getItem(STORAGE_KEYS.LAST_SYNC);
+    return safeStorage.getItem(STORAGE_KEYS.LAST_SYNC);
   },
   async setLastSyncTime(time = new Date().toISOString()) {
-    return AsyncStorage.setItem(STORAGE_KEYS.LAST_SYNC, time);
+    return safeStorage.setItem(STORAGE_KEYS.LAST_SYNC, time);
   },
 
   // Pending sync operations queue (for offline support)
@@ -66,8 +112,8 @@ export const localStorage = {
     const ops = await this.getPendingSyncOperations();
     const newOp = {
       id: operation.id || 'op_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      type: operation.type, // 'CREATE_POLICY' | 'UPDATE_POLICY' | 'DELETE_POLICY' | 'CREATE_PAYMENT' | 'UPDATE_PAYMENT' | 'MARK_PAID' | 'DELETE_PAYMENT'
-      entity: operation.entity, // 'policy' | 'payment'
+      type: operation.type,
+      entity: operation.entity,
       data: operation.data,
       timestamp: new Date().toISOString(),
       retryCount: 0,
@@ -82,23 +128,23 @@ export const localStorage = {
     await setItemJSON(STORAGE_KEYS.PENDING_OPS, filtered);
   },
   async clearPendingSyncOperations() {
-    await AsyncStorage.removeItem(STORAGE_KEYS.PENDING_OPS);
+    await safeStorage.removeItem(STORAGE_KEYS.PENDING_OPS);
   },
 
   // Migration status
   async getMigrationVersion() {
-    const raw = await AsyncStorage.getItem(STORAGE_KEYS.MIGRATION_VERSION);
+    const raw = await safeStorage.getItem(STORAGE_KEYS.MIGRATION_VERSION);
     return raw ? parseInt(raw, 10) : 0;
   },
   async setMigrationVersion(version = CURRENT_MIGRATION_VERSION) {
-    await AsyncStorage.setItem(STORAGE_KEYS.MIGRATION_VERSION, String(version));
+    await safeStorage.setItem(STORAGE_KEYS.MIGRATION_VERSION, String(version));
   },
 
   // User Settings
   async getSettings() {
     return getItemJSON(STORAGE_KEYS.SETTINGS, {
       notificationsEnabled: true,
-      reminderDaysBefore: 7, // 7 days before
+      reminderDaysBefore: 7,
       reminderOnDueDate: true,
       reminderDayBefore: true,
       currency: 'INR',
@@ -112,7 +158,7 @@ export const localStorage = {
   // Clear all user cache on logout
   async clearUserCache() {
     try {
-      await AsyncStorage.multiRemove([
+      await safeStorage.multiRemove([
         STORAGE_KEYS.POLICIES,
         STORAGE_KEYS.PAYMENTS,
         STORAGE_KEYS.PROFILE,

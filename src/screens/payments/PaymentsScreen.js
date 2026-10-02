@@ -16,7 +16,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { formatCurrency } from '../../utils/currencyUtils';
-import { getDueStatus } from '../../utils/dateUtils';
+import { getDueStatus, isDateInFinancialYear } from '../../utils/dateUtils';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing, borderRadius } from '../../theme/spacing';
@@ -31,11 +31,12 @@ const FILTER_TABS = [
 ];
 
 export const PaymentsScreen = ({ navigation }) => {
-  const { payments, markPaymentPaid, refreshing, loadData } = usePolicies();
+  const { payments, markPaymentPaid, refreshing, loadData, stats } = usePolicies();
 
   const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' | 'all'
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [fyOnly, setFyOnly] = useState(true);
 
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
@@ -64,6 +65,11 @@ export const PaymentsScreen = ({ navigation }) => {
       list = list.filter((p) => p.status !== PAYMENT_STATUSES.PAID);
     }
 
+    // Scope upcoming tab to current Financial Year if fyOnly is active
+    if (activeTab === 'upcoming' && fyOnly && stats?.financialYear) {
+      list = list.filter((p) => isDateInFinancialYear(p.dueDate, stats.financialYear));
+    }
+
     // Sort order
     if (activeTab === 'upcoming') {
       // Earliest due date first
@@ -76,7 +82,7 @@ export const PaymentsScreen = ({ navigation }) => {
         return new Date(dateB).getTime() - new Date(dateA).getTime();
       });
     }
-  }, [payments, activeTab, activeFilter, searchQuery]);
+  }, [payments, activeTab, activeFilter, searchQuery, fyOnly, stats?.financialYear]);
 
   const handleOpenMarkPaid = (payment) => {
     setSelectedPayment(payment);
@@ -185,6 +191,29 @@ export const PaymentsScreen = ({ navigation }) => {
         />
       </View>
 
+      {/* Financial Year Scope Bar for Upcoming Tab */}
+      {activeTab === 'upcoming' && (
+        <View style={styles.fyToggleBar}>
+          <View style={styles.fyInfo}>
+            <Ionicons name="calendar-outline" size={14} color={colors.primary} />
+            <Text style={styles.fyInfoText}>
+              {fyOnly
+                ? `${stats?.financialYear?.label || 'FY'} (${stats?.financialYear?.displayRange || '1 Apr - 31 Mar'})`
+                : 'All Future Installments'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setFyOnly((prev) => !prev)}
+            style={styles.fyToggleBtn}
+          >
+            <Text style={styles.fyToggleBtnText}>
+              {fyOnly ? 'Show All' : 'Only Current FY'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Payments List */}
       <FlatList
         data={filteredPayments}
@@ -216,14 +245,29 @@ export const PaymentsScreen = ({ navigation }) => {
               activeFilter !== 'all' || searchQuery
                 ? 'No matching payments'
                 : activeTab === 'upcoming'
-                ? 'No upcoming payments'
+                ? `No dues in ${stats?.financialYear?.label || 'current FY'}`
                 : 'No payments recorded'
             }
             description={
               activeFilter !== 'all' || searchQuery
                 ? 'Try changing the status filter or clearing your search.'
-                : 'Your upcoming policy premium installments will appear here.'
+                : activeTab === 'upcoming'
+                ? fyOnly
+                  ? `No pending premiums due between ${stats?.financialYear?.displayRange || '1 Apr - 31 Mar'}. Tap "Show All" to see later years.`
+                  : 'No upcoming policy premium installments found.'
+                : 'Your policy premium installments will appear here.'
             }
+            buttonTitle={activeFilter !== 'all' || searchQuery ? 'Clear Filters' : null}
+            buttonIcon={
+              activeFilter !== 'all' || searchQuery ? (
+                <Ionicons name="close-circle-outline" size={18} color={colors.primary} />
+              ) : null
+            }
+            buttonVariant="outline"
+            onButtonPress={() => {
+              setActiveFilter('all');
+              setSearchQuery('');
+            }}
           />
         }
       />
@@ -231,13 +275,13 @@ export const PaymentsScreen = ({ navigation }) => {
       {/* Mark Paid Confirmation Modal */}
       <ConfirmDialog
         visible={confirmModalVisible}
-        title="Confirm Payment"
+        title="Mark Payment as Paid"
         message={
           selectedPayment
             ? `Mark installment of ${formatCurrency(selectedPayment.amount)} for ${selectedPayment.policyName || 'this policy'} as paid?`
             : 'Confirm payment?'
         }
-        confirmText="Mark as Paid"
+        confirmText="Yes, Mark Paid"
         confirmVariant="primary"
         loading={markingPaid}
         onConfirm={handleConfirmMarkPaid}
@@ -339,6 +383,39 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: colors.textInverse,
+  },
+  fyToggleBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    backgroundColor: colors.primaryLight,
+    borderRadius: borderRadius.md,
+  },
+  fyInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  fyInfoText: {
+    ...typography.captionBold,
+    color: colors.primaryDark,
+    fontSize: 12,
+  },
+  fyToggleBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.surface,
+  },
+  fyToggleBtnText: {
+    ...typography.captionBold,
+    color: colors.primary,
+    fontSize: 11,
   },
   listContent: {
     padding: spacing.lg,

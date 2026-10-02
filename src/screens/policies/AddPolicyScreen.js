@@ -15,6 +15,7 @@ import { usePolicies } from '../../context/PolicyContext';
 import { Header } from '../../components/Header';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
+import { DatePickerInput } from '../../components/DatePickerInput';
 import { validatePolicyForm } from '../../utils/validation';
 import { calculateEndDate, formatDate } from '../../utils/dateUtils';
 import { colors } from '../../theme/colors';
@@ -216,11 +217,10 @@ export const AddPolicyScreen = ({ navigation }) => {
 
           <View style={styles.rowInputs}>
             <View style={styles.halfInput}>
-              <Input
+              <DatePickerInput
                 label="Start Date"
-                placeholder="YYYY-MM-DD"
                 value={startDate}
-                onChangeText={handleStartDateChange}
+                onChange={handleStartDateChange}
                 error={errors.startDate}
                 required
               />
@@ -244,12 +244,11 @@ export const AddPolicyScreen = ({ navigation }) => {
 
           <View style={styles.rowInputs}>
             <View style={styles.halfInput}>
-              <Input
+              <DatePickerInput
                 label="Next Due Date"
-                placeholder="YYYY-MM-DD"
                 value={nextDueDate}
-                onChangeText={(t) => {
-                  setNextDueDate(t);
+                onChange={(date) => {
+                  setNextDueDate(date);
                   if (errors.nextDueDate) setErrors((prev) => ({ ...prev, nextDueDate: null }));
                 }}
                 error={errors.nextDueDate}

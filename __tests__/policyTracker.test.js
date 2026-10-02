@@ -18,6 +18,9 @@ import {
   getDueStatus,
   generatePaymentSchedule,
   calculateNextDueDateFromPayments,
+  getFinancialYear,
+  isDateInFinancialYear,
+  filterPaymentsByFinancialYear,
 } from '../src/utils/dateUtils';
 
 import {
@@ -147,6 +150,67 @@ describe('Date Utilities & Calculations', () => {
     // When all are paid
     const allPaid = payments.map((p) => ({ ...p, status: PAYMENT_STATUSES.PAID }));
     expect(calculateNextDueDateFromPayments(allPaid)).toBeNull();
+  });
+
+  it('determines the Indian Financial Year (1 Apr - 31 Mar) correctly', () => {
+    // October 2026 => FY 2026-27 (1 Apr 2026 - 31 Mar 2027)
+    const fyOct = getFinancialYear('2026-10-01');
+    expect(fyOct.startYear).toBe(2026);
+    expect(fyOct.endYear).toBe(2027);
+    expect(fyOct.startDate).toBe('2026-04-01');
+    expect(fyOct.endDate).toBe('2027-03-31');
+    expect(fyOct.label).toBe('FY 2026-27');
+    expect(fyOct.displayRange).toBe('1 Apr 2026 - 31 Mar 2027');
+
+    // February 2027 => still FY 2026-27
+    const fyFeb = getFinancialYear('2027-02-15');
+    expect(fyFeb.startYear).toBe(2026);
+    expect(fyFeb.endYear).toBe(2027);
+    expect(fyFeb.startDate).toBe('2026-04-01');
+    expect(fyFeb.endDate).toBe('2027-03-31');
+
+    // March 31 2026 => FY 2025-26
+    const fyMar = getFinancialYear('2026-03-31');
+    expect(fyMar.startYear).toBe(2025);
+    expect(fyMar.endYear).toBe(2026);
+    expect(fyMar.startDate).toBe('2025-04-01');
+    expect(fyMar.endDate).toBe('2026-03-31');
+
+    // April 1 2026 => FY 2026-27
+    const fyApr = getFinancialYear('2026-04-01');
+    expect(fyApr.startYear).toBe(2026);
+    expect(fyApr.endYear).toBe(2027);
+  });
+
+  it('checks if a date falls inside the Financial Year', () => {
+    const fy2026_27 = getFinancialYear('2026-10-01');
+
+    expect(isDateInFinancialYear('2026-04-01', fy2026_27)).toBe(true);
+    expect(isDateInFinancialYear('2026-10-15', fy2026_27)).toBe(true);
+    expect(isDateInFinancialYear('2027-03-31', fy2026_27)).toBe(true);
+
+    // Day before FY start => false
+    expect(isDateInFinancialYear('2026-03-31', fy2026_27)).toBe(false);
+    // Day after FY end => false
+    expect(isDateInFinancialYear('2027-04-01', fy2026_27)).toBe(false);
+    // Different year => false
+    expect(isDateInFinancialYear('2028-10-01', fy2026_27)).toBe(false);
+  });
+
+  it('filters payments strictly to the current Financial Year', () => {
+    const fy = getFinancialYear('2026-10-01'); // 1 Apr 2026 - 31 Mar 2027
+
+    const testPayments = [
+      { id: '1', dueDate: '2026-03-15', amount: 10000 }, // previous FY
+      { id: '2', dueDate: '2026-05-10', amount: 15000 }, // within FY
+      { id: '3', dueDate: '2026-11-20', amount: 20000 }, // within FY
+      { id: '4', dueDate: '2027-02-28', amount: 25000 }, // within FY
+      { id: '5', dueDate: '2027-05-01', amount: 30000 }, // next FY
+    ];
+
+    const filtered = filterPaymentsByFinancialYear(testPayments, fy);
+    expect(filtered.length).toBe(3);
+    expect(filtered.map((p) => p.id)).toEqual(['2', '3', '4']);
   });
 });
 

@@ -149,8 +149,8 @@ export const syncService = {
 
     // Save remaining failed operations back
     const { STORAGE_KEYS } = await import('../utils/constants');
-    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-    await AsyncStorage.setItem(STORAGE_KEYS.PENDING_OPS, JSON.stringify(remainingOps));
+    const { safeStorage } = await import('../storage/localStorage');
+    await safeStorage.setItem(STORAGE_KEYS.PENDING_OPS, JSON.stringify(remainingOps));
 
     return {
       success: errors.length === 0,

@@ -6,6 +6,7 @@ import { notificationService } from '../services/notificationService';
 import { localStorage } from '../storage/localStorage';
 import { useAuth } from './AuthContext';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { getFinancialYear, isDateInFinancialYear } from '../utils/dateUtils';
 import { POLICY_STATUSES, PAYMENT_STATUSES } from '../utils/constants';
 
 const PolicyContext = createContext(null);
@@ -196,24 +197,26 @@ export const PolicyProvider = ({ children }) => {
   }, [user?.id, syncing]);
 
   // Dashboard Stats Calculations (Section 18)
+  // Dashboard Stats Calculations (Section 18) - Scoped to Current Financial Year (1 Apr - 31 Mar)
   const stats = useMemo(() => {
-    const currentYear = new Date().getFullYear();
+    const fy = getFinancialYear();
 
     const totalPolicies = policies.length;
     const activePolicies = policies.filter((p) => p.status === POLICY_STATUSES.ACTIVE).length;
 
-    const unpaidPayments = payments.filter((p) => p.status !== PAYMENT_STATUSES.PAID);
-    const upcomingPaymentsCount = unpaidPayments.length;
+    // Filter payments for the current Financial Year (1 Apr to 31 Mar)
+    const fyPayments = payments.filter((p) => isDateInFinancialYear(p.dueDate, fy));
+    const unpaidFyPayments = fyPayments.filter((p) => p.status !== PAYMENT_STATUSES.PAID);
+    const upcomingPaymentsCount = unpaidFyPayments.length;
 
-    // Total premium due across all unpaid upcoming payments
-    const totalPremiumDue = unpaidPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    // Total premium due in current Financial Year
+    const totalPremiumDue = unpaidFyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
-    // Paid this calendar year
+    // Paid in current Financial Year
     const paidThisYear = payments
       .filter((p) => {
         if (p.status !== PAYMENT_STATUSES.PAID || !p.paidDate) return false;
-        const paidYear = new Date(p.paidDate).getFullYear();
-        return paidYear === currentYear;
+        return isDateInFinancialYear(p.paidDate, fy);
       })
       .reduce((sum, p) => sum + (Number(p.paidAmount || p.amount) || 0), 0);
 
@@ -223,11 +226,29 @@ export const PolicyProvider = ({ children }) => {
       upcomingPaymentsCount,
       totalPremiumDue,
       paidThisYear,
+      financialYear: fy,
     };
   }, [policies, payments]);
 
-  // Upcoming Payments list for dashboard (sorted due_date ASC)
+  // Upcoming Payments list for dashboard (Filtered to current Financial Year e.g. 1-4-2026 to 31-3-2027)
   const upcomingPayments = useMemo(() => {
+    const fy = getFinancialYear();
+    const policyMap = new Map(policies.map((p) => [p.id, p]));
+    return payments
+      .filter((p) => p && p.status !== PAYMENT_STATUSES.PAID && isDateInFinancialYear(p.dueDate, fy))
+      .map((p) => {
+        const policy = policyMap.get(p.policyId);
+        return {
+          ...p,
+          policyName: policy ? policy.policyName : (p.policyName || 'Policy'),
+          companyName: policy ? policy.companyName : (p.companyName || ''),
+        };
+      })
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }, [payments, policies]);
+
+  // All upcoming payments (across entire policy lifetimes)
+  const allUpcomingPayments = useMemo(() => {
     const policyMap = new Map(policies.map((p) => [p.id, p]));
     return payments
       .filter((p) => p && p.status !== PAYMENT_STATUSES.PAID)
@@ -252,6 +273,8 @@ export const PolicyProvider = ({ children }) => {
     error,
     stats,
     upcomingPayments,
+    allUpcomingPayments,
+    financialYear: getFinancialYear(),
     loadData,
     addPolicy,
     updatePolicy,

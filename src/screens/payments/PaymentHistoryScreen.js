@@ -140,13 +140,13 @@ export const PaymentHistoryScreen = ({ navigation }) => {
 
       <ConfirmDialog
         visible={confirmModalVisible}
-        title="Confirm Payment"
+        title="Mark Payment as Paid"
         message={
           selectedPayment
             ? `Mark installment of ${formatCurrency(selectedPayment.amount)} as paid?`
             : 'Mark payment as paid?'
         }
-        confirmText="Confirm"
+        confirmText="Yes, Mark Paid"
         confirmVariant="primary"
         loading={markingPaid}
         onConfirm={handleConfirmMarkPaid}

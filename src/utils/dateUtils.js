@@ -316,3 +316,64 @@ export function calculateNextDueDateFromPayments(payments = []) {
   }
   return null;
 }
+
+/**
+ * Get current Indian Financial Year details (1 April to 31 March)
+ * @param {Date|string} referenceDate
+ * @returns {{ startYear: number, endYear: number, startDate: string, endDate: string, label: string, displayRange: string }}
+ */
+export function getFinancialYear(referenceDate = new Date()) {
+  const d = new Date(referenceDate);
+  const year = d.getFullYear();
+  const month = d.getMonth(); // 0-indexed: 0 = Jan, 3 = Apr
+
+  let startYear;
+  let endYear;
+
+  if (month >= 3) {
+    // April or later
+    startYear = year;
+    endYear = year + 1;
+  } else {
+    // January to March
+    startYear = year - 1;
+    endYear = year;
+  }
+
+  const startDate = `${startYear}-04-01`;
+  const endDate = `${endYear}-03-31`;
+  const shortEndYear = String(endYear).slice(-2);
+
+  return {
+    startYear,
+    endYear,
+    startDate,
+    endDate,
+    label: `FY ${startYear}-${shortEndYear}`,
+    displayRange: `1 Apr ${startYear} - 31 Mar ${endYear}`,
+  };
+}
+
+/**
+ * Check if a date falls within a given Financial Year
+ * @param {Date|string} date
+ * @param {object} [fy]
+ * @returns {boolean}
+ */
+export function isDateInFinancialYear(date, fy = getFinancialYear()) {
+  if (!date) return false;
+  const formatted = typeof date === 'string' && date.length === 10 ? date : formatDate(date);
+  return formatted >= fy.startDate && formatted <= fy.endDate;
+}
+
+/**
+ * Filter payments that fall within the current or specified Financial Year
+ * @param {Array<object>} payments
+ * @param {object} [fy]
+ * @returns {Array<object>}
+ */
+export function filterPaymentsByFinancialYear(payments = [], fy = getFinancialYear()) {
+  if (!Array.isArray(payments)) return [];
+  return payments.filter((p) => p && isDateInFinancialYear(p.dueDate, fy));
+}
+

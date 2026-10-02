@@ -61,8 +61,8 @@ export const PoliciesScreen = ({ navigation }) => {
           accessibilityRole="button"
           accessibilityLabel="Add Policy"
         >
-          <Ionicons name="add" size={20} color={colors.textInverse} />
-          <Text style={styles.addBtnText}>New</Text>
+          <Ionicons name="add" size={18} color={colors.textInverse} />
+          <Text style={styles.addBtnText}>Add Policy</Text>
         </TouchableOpacity>
       </View>
 
@@ -124,6 +124,35 @@ export const PoliciesScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Active Filter Indicator & Clear Filter Button */}
+      {(activeFilter !== 'all' || searchQuery.trim() !== '') && (
+        <View style={styles.activeFilterRow}>
+          <View style={styles.activeFilterInfo}>
+            <Ionicons name="filter-outline" size={14} color={colors.primary} />
+            <Text style={styles.activeFilterText} numberOfLines={1}>
+              {activeFilter !== 'all'
+                ? `Filter: ${POLICY_FILTERS.find((f) => f.id === activeFilter)?.label || activeFilter}`
+                : ''}
+              {activeFilter !== 'all' && searchQuery.trim() ? ' • ' : ''}
+              {searchQuery.trim() ? `Search: "${searchQuery.trim()}"` : ''}
+            </Text>
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              setActiveFilter('all');
+              setSearchQuery('');
+            }}
+            style={styles.clearFiltersBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Clear all filters"
+          >
+            <Ionicons name="close-circle-outline" size={15} color={colors.danger} />
+            <Text style={styles.clearFiltersBtnText}>Clear Filters</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Policy List */}
       <FlatList
         data={processedPolicies}
@@ -154,6 +183,14 @@ export const PoliciesScreen = ({ navigation }) => {
                   : 'Add your first policy to start tracking premiums and renewal dates.'
               }
               buttonTitle={!searchQuery && activeFilter === 'all' ? 'Add Policy' : 'Clear Filters'}
+              buttonIcon={
+                !searchQuery && activeFilter === 'all' ? (
+                  <Ionicons name="add-circle-outline" size={18} color={colors.textInverse} />
+                ) : (
+                  <Ionicons name="close-circle-outline" size={18} color={colors.primary} />
+                )
+              }
+              buttonVariant={!searchQuery && activeFilter === 'all' ? 'primary' : 'outline'}
               onButtonPress={() => {
                 if (!searchQuery && activeFilter === 'all') {
                   navigation.navigate('AddPolicy');
@@ -317,6 +354,43 @@ const styles = StyleSheet.create({
   sortButtonText: {
     ...typography.captionBold,
     color: colors.textPrimary,
+    fontSize: 11,
+  },
+  activeFilterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    backgroundColor: colors.primaryLight,
+    borderRadius: borderRadius.md,
+  },
+  activeFilterInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    paddingRight: spacing.xs,
+  },
+  activeFilterText: {
+    ...typography.captionBold,
+    color: colors.primaryDark,
+    fontSize: 12,
+  },
+  clearFiltersBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.surface,
+  },
+  clearFiltersBtnText: {
+    ...typography.captionBold,
+    color: colors.danger,
     fontSize: 11,
   },
   listContent: {
