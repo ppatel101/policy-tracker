@@ -34,6 +34,12 @@
           "color": "#2563EB"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6a15e96e-2907-4f2d-990f-67c74d93a825"
+      }
+    },
+    "owner": "parth502"
   }
 }
