@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   KeyboardAvoidingView,
@@ -72,7 +73,11 @@ export const LoginScreen = ({ navigation }) => {
           {/* Brand Header */}
           <View style={styles.brandHeader}>
             <View style={styles.logoCircle}>
-              <Ionicons name="shield-checkmark" size={38} color={colors.primary} />
+              <Image
+                source={require('../../../assets/icon.png')}
+                style={styles.logoImage}
+                resizeMode="cover"
+              />
             </View>
             <Text style={styles.appTitle}>Policy Tracker</Text>
             <Text style={styles.appSubtitle}>
@@ -183,13 +188,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xxl,
   },
   logoCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: colors.primaryLight,
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   appTitle: {
     ...typography.h1,
