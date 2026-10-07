@@ -12,6 +12,7 @@ export const StatCard = ({
   iconBgColor = colors.primaryLight,
   onPress,
   style,
+  compact = true,
 }) => {
   const Component = onPress ? TouchableOpacity : View;
 
@@ -19,25 +20,31 @@ export const StatCard = ({
     <Component
       activeOpacity={0.7}
       onPress={onPress}
-      style={[styles.card, style]}
+      style={[styles.card, compact ? styles.cardCompact : null, style]}
       accessibilityRole={onPress ? 'button' : 'summary'}
     >
-      <View style={styles.headerRow}>
-        <Text style={styles.title} numberOfLines={1}>
+      <View style={[styles.headerRow, compact ? styles.headerRowCompact : null]}>
+        <Text style={[styles.title, compact ? styles.titleCompact : null]} numberOfLines={1}>
           {title}
         </Text>
         {icon && (
-          <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
+          <View
+            style={[
+              styles.iconContainer,
+              compact ? styles.iconContainerCompact : null,
+              { backgroundColor: iconBgColor },
+            ]}
+          >
             {icon}
           </View>
         )}
       </View>
 
-      <Text style={styles.value} numberOfLines={1}>
+      <Text style={[styles.value, compact ? styles.valueCompact : null]} numberOfLines={1}>
         {value}
       </Text>
 
-      {subtitle ? (
+      {subtitle && !compact ? (
         <Text style={styles.subtitle} numberOfLines={1}>
           {subtitle}
         </Text>
@@ -54,12 +61,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     shadowColor: colors.cardShadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
     flex: 1,
-    minWidth: 140,
+    minWidth: 130,
+  },
+  cardCompact: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: borderRadius.md,
   },
   headerRow: {
     flexDirection: 'row',
@@ -67,11 +79,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
+  headerRowCompact: {
+    marginBottom: 4,
+  },
   title: {
     ...typography.captionBold,
     color: colors.textSecondary,
     flex: 1,
     marginRight: spacing.xs,
+  },
+  titleCompact: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   iconContainer: {
     width: 32,
@@ -80,10 +99,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconContainerCompact: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+  },
   value: {
     ...typography.statValue,
     color: colors.textPrimary,
     marginTop: spacing.xxs,
+  },
+  valueCompact: {
+    fontSize: 20,
+    fontWeight: '700',
+    lineHeight: 24,
+    marginTop: 0,
   },
   subtitle: {
     ...typography.caption,

@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { usePolicies } from '../../context/PolicyContext';
+import { ProtectionHeroCard } from '../../components/ProtectionHeroCard';
 import { StatCard } from '../../components/StatCard';
 import { PaymentCard } from '../../components/PaymentCard';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -18,14 +19,17 @@ import { OfflineBanner } from '../../components/OfflineBanner';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { formatCurrency } from '../../utils/currencyUtils';
+import { isDateInFinancialYear } from '../../utils/dateUtils';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing, borderRadius } from '../../theme/spacing';
+import { PAYMENT_STATUSES } from '../../utils/constants';
 
 export const DashboardScreen = ({ navigation }) => {
   const { user, profile } = useAuth();
   const {
     policies,
+    payments,
     upcomingPayments,
     stats,
     loading,
@@ -39,6 +43,12 @@ export const DashboardScreen = ({ navigation }) => {
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
+
+  // Protection Hero Board Metrics (strictly live user data, defaulting to 0)
+  const displaySumAssured = Number(stats.totalSumAssured) || 0;
+  const displayPaidAmount = Number(stats.premiumProgress?.paidThisYear ?? stats.paidThisYear) || 0;
+  const displayPendingAmount = Number(stats.premiumProgress?.pendingThisYear ?? stats.totalPremiumDue) || 0;
+  const displayPercentPaid = Number(stats.premiumProgress?.percentPaid) || 0;
 
   const handleOpenMarkPaid = (payment) => {
     setSelectedPayment(payment);
@@ -124,47 +134,45 @@ export const DashboardScreen = ({ navigation }) => {
           </View>
         </View>
 
+        {/* Protection Hero Board */}
+        <View style={styles.heroSection}>
+          <ProtectionHeroCard
+            title="TOTAL SUM ASSURED"
+            sumAssured={displaySumAssured}
+            financialYearLabel={stats.financialYear?.label || 'FY 2026–27'}
+            paidAmount={displayPaidAmount}
+            pendingAmount={displayPendingAmount}
+            percentPaid={displayPercentPaid}
+            badgeText="100% Protected"
+            badgeIcon="shield"
+            onPress={() => navigation.navigate(policies && policies.length > 0 ? 'PoliciesTab' : 'AddPolicy')}
+          />
+        </View>
+
         {/* Financial Overview / Stats Cards (Section 18) */}
         <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>Overview</Text>
+          <Text style={[styles.sectionTitle, { marginBottom: spacing.sm }]}>Overview</Text>
 
-          {/* Row 1: Total Policies & Active */}
+          {/* Small boxes: Total Active Policies & Upcoming Dues */}
           <View style={styles.statsRow}>
             <StatCard
+              compact
               title="Total Policies"
-              value={stats.totalPolicies}
-              subtitle={`${stats.activePolicies} active`}
-              icon={<Ionicons name="shield-checkmark" size={18} color={colors.primary} />}
+              value={stats.activePolicies}
+              icon={<Ionicons name="shield-checkmark" size={15} color={colors.primary} />}
               iconBgColor={colors.primaryLight}
               onPress={() => navigation.navigate('PoliciesTab')}
             />
             <StatCard
+              compact
               title="Upcoming Dues"
               value={stats.upcomingPaymentsCount}
-              subtitle="Pending payments"
-              icon={<Ionicons name="calendar-outline" size={18} color={colors.warning} />}
+              icon={<Ionicons name="calendar-outline" size={15} color={colors.warning} />}
               iconBgColor={colors.warningLight}
               onPress={() => navigation.navigate('PaymentsTab')}
             />
           </View>
 
-          {/* Row 2: Premium Due & Paid This Year */}
-          <View style={styles.statsRow}>
-            <StatCard
-              title="Total Due"
-              value={formatCurrency(stats.totalPremiumDue)}
-              subtitle={`${stats.financialYear?.label || 'FY'} pending`}
-              icon={<Ionicons name="cash-outline" size={18} color={colors.danger} />}
-              iconBgColor={colors.dangerLight}
-            />
-            <StatCard
-              title="Paid This Year"
-              value={formatCurrency(stats.paidThisYear)}
-              subtitle={`${stats.financialYear?.label || 'FY'} paid`}
-              icon={<Ionicons name="checkmark-done" size={18} color={colors.success} />}
-              iconBgColor={colors.successLight}
-            />
-          </View>
         </View>
 
         {/* Upcoming Payments Section (Financial Year 1 Apr - 31 Mar) */}
@@ -303,6 +311,11 @@ const styles = StyleSheet.create({
   addBtnText: {
     ...typography.bodyBold,
     color: colors.textInverse,
+  },
+  heroSection: {
+    width: '100%',
+    marginBottom: spacing.xl,
+    alignItems: 'center',
   },
   statsSection: {
     marginBottom: spacing.xl,

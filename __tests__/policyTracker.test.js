@@ -23,6 +23,7 @@ import {
   getFinancialYear,
   isDateInFinancialYear,
   filterPaymentsByFinancialYear,
+  isCurrentYearPremium,
 } from '../src/utils/dateUtils';
 
 import {
@@ -72,17 +73,26 @@ describe('Currency Utilities (Indian Number Formatting)', () => {
 
   it('breaks down sum assured into value and unit parts', () => {
     const parts10L = formatSumAssuredParts(1000000);
+    expect(parts10L.symbol).toBe('₹');
     expect(parts10L.value).toBe('10');
     expect(parts10L.unit).toBe('Lakhs');
     expect(parts10L.fullText).toBe('₹10 Lakhs');
 
     const parts = formatSumAssuredParts(1250000);
+    expect(parts.symbol).toBe('₹');
     expect(parts.value).toBe('12.5');
     expect(parts.unit).toBe('Lakhs');
 
     const parts1Cr = formatSumAssuredParts(10000000);
+    expect(parts1Cr.symbol).toBe('₹');
     expect(parts1Cr.value).toBe('1');
     expect(parts1Cr.unit).toBe('Crore');
+
+    const partsZero = formatSumAssuredParts(0);
+    expect(partsZero.symbol).toBe('₹');
+    expect(partsZero.value).toBe('0');
+    expect(partsZero.unit).toBe('');
+    expect(partsZero.fullText).toBe('₹0');
   });
 });
 
@@ -237,6 +247,24 @@ describe('Date Utilities & Calculations', () => {
     const filtered = filterPaymentsByFinancialYear(testPayments, fy);
     expect(filtered.length).toBe(3);
     expect(filtered.map((p) => p.id)).toEqual(['2', '3', '4']);
+  });
+
+  it('determines if a payment is eligible to be marked as paid (current year premium only)', () => {
+    const today = new Date('2026-10-07');
+
+    // Due in current calendar year / current FY: eligible
+    expect(isCurrentYearPremium('2026-10-28', today)).toBe(true);
+    expect(isCurrentYearPremium('2026-12-15', today)).toBe(true);
+    expect(isCurrentYearPremium('2027-02-10', today)).toBe(true); // Within current FY 2026-27
+
+    // Overdue from past: eligible
+    expect(isCurrentYearPremium('2026-05-10', today)).toBe(true);
+    expect(isCurrentYearPremium('2025-10-28', today)).toBe(true);
+
+    // Future years (next year FY 2027-28 and beyond): NOT eligible
+    expect(isCurrentYearPremium('2027-10-28', today)).toBe(false);
+    expect(isCurrentYearPremium('2028-10-28', today)).toBe(false);
+    expect(isCurrentYearPremium('2035-10-28', today)).toBe(false);
   });
 });
 
@@ -415,4 +443,70 @@ describe('Model Mappings (camelCase <-> snake_case)', () => {
     expect(convertedRow.paid_date).toBe('2027-09-28');
     expect(convertedRow.paid_amount).toBe(20000);
   });
+
+  describe('Policy Details Premium Summary Calculations', () => {
+    it('calculates total premium paid and total remaining correctly from installments', () => {
+      const installments = [
+        { id: '1', amount: 25000, status: PAYMENT_STATUSES.PAID },
+        { id: '2', amount: 25000, status: PAYMENT_STATUSES.PAID },
+        { id: '3', amount: 25000, status: PAYMENT_STATUSES.UPCOMING },
+        { id: '4', amount: 25000, status: PAYMENT_STATUSES.UPCOMING },
+      ];
+
+      const paidPayments = installments.filter((p) => p.status === PAYMENT_STATUSES.PAID);
+      const remainingPayments = installments.filter((p) => p.status !== PAYMENT_STATUSES.PAID);
+
+      const totalPaid = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const totalRemaining = remainingPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+
+      expect(totalPaid).toBe(50000);
+      expect(totalRemaining).toBe(50000);
+      expect(paidPayments.length).toBe(2);
+      expect(remainingPayments.length).toBe(2);
+      expect(formatCurrency(totalPaid)).toBe('₹50,000');
+      expect(formatCurrency(totalRemaining)).toBe('₹50,000');
+    });
+
+    it('handles 100% completed premiums correctly', () => {
+      const installments = [
+        { id: '1', amount: 15000, status: PAYMENT_STATUSES.PAID },
+        { id: '2', amount: 15000, status: PAYMENT_STATUSES.PAID },
+      ];
+
+      const totalPaid = installments
+        .filter((p) => p.status === PAYMENT_STATUSES.PAID)
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+
+      const totalRemaining = installments
+        .filter((p) => p.status !== PAYMENT_STATUSES.PAID)
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+
+      expect(totalPaid).toBe(30000);
+      expect(totalRemaining).toBe(0);
+      expect(formatCurrency(totalPaid)).toBe('₹30,000');
+      expect(formatCurrency(totalRemaining)).toBe('₹0');
+    });
+
+    it('handles all unpaid premiums correctly', () => {
+      const installments = [
+        { id: '1', amount: 10000, status: PAYMENT_STATUSES.OVERDUE },
+        { id: '2', amount: 10000, status: PAYMENT_STATUSES.UPCOMING },
+        { id: '3', amount: 10000, status: PAYMENT_STATUSES.UPCOMING },
+      ];
+
+      const totalPaid = installments
+        .filter((p) => p.status === PAYMENT_STATUSES.PAID)
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+
+      const totalRemaining = installments
+        .filter((p) => p.status !== PAYMENT_STATUSES.PAID)
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+
+      expect(totalPaid).toBe(0);
+      expect(totalRemaining).toBe(30000);
+      expect(formatCurrency(totalPaid)).toBe('₹0');
+      expect(formatCurrency(totalRemaining)).toBe('₹30,000');
+    });
+  });
 });
+

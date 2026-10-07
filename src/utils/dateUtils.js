@@ -377,3 +377,40 @@ export function filterPaymentsByFinancialYear(payments = [], fy = getFinancialYe
   return payments.filter((p) => p && isDateInFinancialYear(p.dueDate, fy));
 }
 
+/**
+ * Check if a payment due date belongs to the current year premium period
+ * (due in current Indian Financial Year, current calendar year, or past/overdue).
+ * Payments for future years (beyond current FY/year) cannot be marked as paid.
+ * @param {string|Date} dueDate
+ * @param {Date} [referenceDate]
+ * @returns {boolean}
+ */
+export function isCurrentYearPremium(dueDate, referenceDate = new Date()) {
+  if (!dueDate) return false;
+  const d = new Date(dueDate);
+  if (isNaN(d.getTime())) return false;
+
+  const today = new Date(referenceDate);
+  const formattedToday = formatDate(today);
+  const formattedDue = typeof dueDate === 'string' && dueDate.length === 10 ? dueDate : formatDate(d);
+
+  // Overdue payments or payments due today can always be marked as paid
+  if (formattedDue <= formattedToday) {
+    return true;
+  }
+
+  // Current Indian Financial Year (e.g. 1 Apr 2026 - 31 Mar 2027)
+  const fy = getFinancialYear(today);
+  if (formattedDue >= fy.startDate && formattedDue <= fy.endDate) {
+    return true;
+  }
+
+  // Current Calendar Year (e.g. 2026)
+  if (d.getFullYear() === today.getFullYear()) {
+    return true;
+  }
+
+  return false;
+}
+
+

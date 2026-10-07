@@ -224,6 +224,18 @@ export const PolicyProvider = ({ children }) => {
       .filter((p) => (p.status || 'active').toLowerCase() === POLICY_STATUSES.ACTIVE)
       .reduce((sum, p) => sum + (Number(p.sumAssured) || 0), 0);
 
+    const totalPremiumThisYear = paidThisYear + totalPremiumDue;
+    const percentPaid = totalPremiumThisYear > 0
+      ? Math.round((paidThisYear / totalPremiumThisYear) * 100)
+      : (paidThisYear > 0 ? 100 : 0);
+
+    const premiumProgress = {
+      paidThisYear,
+      pendingThisYear: totalPremiumDue,
+      totalThisYear: totalPremiumThisYear,
+      percentPaid,
+    };
+
     return {
       totalPolicies,
       activePolicies,
@@ -231,6 +243,7 @@ export const PolicyProvider = ({ children }) => {
       upcomingPaymentsCount,
       totalPremiumDue,
       paidThisYear,
+      premiumProgress,
       financialYear: fy,
     };
   }, [policies, payments]);

@@ -67,13 +67,14 @@ export function parseCurrencyInput(value) {
 export function formatSumAssuredParts(amount) {
   const num = typeof amount === 'number' ? amount : parseCurrencyInput(amount);
   if (!num || num <= 0) {
-    return { value: '0', unit: '', fullText: '₹0' };
+    return { symbol: '₹', value: '0', unit: '', fullText: '₹0' };
   }
 
   if (num >= 10000000) {
     const cr = parseFloat((num / 10000000).toFixed(2));
     const unit = cr === 1 ? 'Crore' : 'Crores';
     return {
+      symbol: '₹',
       value: String(cr),
       unit,
       fullText: `₹${cr} ${unit}`,
@@ -84,6 +85,7 @@ export function formatSumAssuredParts(amount) {
     const lakh = parseFloat((num / 100000).toFixed(2));
     const unit = lakh === 1 ? 'Lakh' : 'Lakhs';
     return {
+      symbol: '₹',
       value: String(lakh),
       unit,
       fullText: `₹${lakh} ${unit}`,
@@ -92,6 +94,7 @@ export function formatSumAssuredParts(amount) {
 
   const formatted = formatCurrency(num);
   return {
+    symbol: '₹',
     value: formatIndianNumber(num),
     unit: '',
     fullText: formatted,

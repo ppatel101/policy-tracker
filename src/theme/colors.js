@@ -18,7 +18,7 @@ export const colors = {
 
   // Status colors
   success: '#10B981',        // Emerald 500
-  successLight: '#D1FAE5',
+  successLight: '#9df2c6',
   warning: '#F59E0B',        // Amber 500
   warningLight: '#FEF3C7',
   danger: '#EF4444',         // Rose 500

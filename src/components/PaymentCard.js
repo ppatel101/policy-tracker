@@ -6,7 +6,7 @@ import { typography } from '../theme/typography';
 import { borderRadius, spacing } from '../theme/spacing';
 import { Badge } from './Badge';
 import { formatCurrency } from '../utils/currencyUtils';
-import { formatDisplayDate, getDueStatus, getDueText } from '../utils/dateUtils';
+import { formatDisplayDate, getDueStatus, getDueText, isCurrentYearPremium } from '../utils/dateUtils';
 import { PAYMENT_STATUSES } from '../utils/constants';
 
 export const PaymentCard = ({
@@ -37,6 +37,8 @@ export const PaymentCard = ({
   };
 
   const isPaid = payment.status === PAYMENT_STATUSES.PAID;
+  const isCurrentYear = isCurrentYearPremium(payment.dueDate);
+  const canMarkPaid = Boolean(onMarkPaid && !isPaid && isCurrentYear);
 
   return (
     <TouchableOpacity
@@ -89,7 +91,7 @@ export const PaymentCard = ({
                 Paid on {formatDisplayDate(payment.paidDate || payment.dueDate)}
               </Text>
             </View>
-          ) : (
+          ) : canMarkPaid ? (
             <TouchableOpacity
               activeOpacity={0.75}
               onPress={() => onMarkPaid && onMarkPaid(payment)}
@@ -100,6 +102,11 @@ export const PaymentCard = ({
               <Ionicons name="checkmark-done" size={16} color={colors.success} />
               <Text style={styles.markPaidBtnText}>Mark as Paid</Text>
             </TouchableOpacity>
+          ) : (
+            <View style={styles.futureBadge}>
+              <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
+              <Text style={styles.futureBadgeText}>Future Installment</Text>
+            </View>
           )}
 
           {payment.installmentNumber ? (
@@ -215,5 +222,20 @@ const styles = StyleSheet.create({
   installmentText: {
     ...typography.caption,
     color: colors.textMuted,
+  },
+  futureBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceVariant,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    borderRadius: borderRadius.sm,
+    gap: 5,
+  },
+  futureBadgeText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
