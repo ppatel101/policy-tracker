@@ -33,7 +33,16 @@ export const syncService = {
             const policyRow = mapPolicyToRow(policy);
 
             // Upsert policy
-            const { error: pErr } = await supabase.from('policies').upsert(policyRow);
+            let { error: pErr } = await supabase.from('policies').upsert(policyRow);
+            const pErrMsg = pErr
+              ? `${pErr.message || ''} ${pErr.details || ''} ${pErr.hint || ''}`.toLowerCase()
+              : '';
+            if (pErr && (pErrMsg.includes('sum_assured') || pErr.code === 'PGRST204')) {
+              const fallbackRow = { ...policyRow };
+              delete fallbackRow.sum_assured;
+              const retry = await supabase.from('policies').upsert(fallbackRow);
+              pErr = retry.error;
+            }
             if (pErr) throw pErr;
 
             // Upsert payment schedule if present
@@ -53,11 +62,24 @@ export const syncService = {
             const { policy } = op.data;
             policy.userId = userId;
             const row = mapPolicyToRow(policy);
-            const { error } = await supabase
+            let { error } = await supabase
               .from('policies')
               .update(row)
               .eq('id', policy.id)
               .eq('user_id', userId);
+            const uErrMsg = error
+              ? `${error.message || ''} ${error.details || ''} ${error.hint || ''}`.toLowerCase()
+              : '';
+            if (error && (uErrMsg.includes('sum_assured') || error.code === 'PGRST204')) {
+              const fallbackRow = { ...row };
+              delete fallbackRow.sum_assured;
+              const retry = await supabase
+                .from('policies')
+                .update(fallbackRow)
+                .eq('id', policy.id)
+                .eq('user_id', userId);
+              error = retry.error;
+            }
             if (error) throw error;
             syncedCount++;
             break;

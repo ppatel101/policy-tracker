@@ -58,3 +58,52 @@ export function parseCurrencyInput(value) {
   const parsed = parseFloat(cleaned);
   return isNaN(parsed) ? 0 : parsed;
 }
+
+/**
+ * Break down sum assured into value and unit (e.g. { value: '10', unit: 'Lakhs', fullText: '₹10 Lakhs' })
+ * @param {number|string} amount
+ * @returns {{ value: string, unit: string, fullText: string }}
+ */
+export function formatSumAssuredParts(amount) {
+  const num = typeof amount === 'number' ? amount : parseCurrencyInput(amount);
+  if (!num || num <= 0) {
+    return { value: '0', unit: '', fullText: '₹0' };
+  }
+
+  if (num >= 10000000) {
+    const cr = parseFloat((num / 10000000).toFixed(2));
+    const unit = cr === 1 ? 'Crore' : 'Crores';
+    return {
+      value: String(cr),
+      unit,
+      fullText: `₹${cr} ${unit}`,
+    };
+  }
+
+  if (num >= 100000) {
+    const lakh = parseFloat((num / 100000).toFixed(2));
+    const unit = lakh === 1 ? 'Lakh' : 'Lakhs';
+    return {
+      value: String(lakh),
+      unit,
+      fullText: `₹${lakh} ${unit}`,
+    };
+  }
+
+  const formatted = formatCurrency(num);
+  return {
+    value: formatIndianNumber(num),
+    unit: '',
+    fullText: formatted,
+  };
+}
+
+/**
+ * Format sum assured into compact Indian representation (e.g. ₹10 Lakhs, ₹1 Crore)
+ * @param {number|string} amount
+ * @returns {string}
+ */
+export function formatSumAssured(amount) {
+  const parts = formatSumAssuredParts(amount);
+  return parts.fullText;
+}

@@ -220,9 +220,14 @@ export const PolicyProvider = ({ children }) => {
       })
       .reduce((sum, p) => sum + (Number(p.paidAmount || p.amount) || 0), 0);
 
+    const totalSumAssured = policies
+      .filter((p) => (p.status || 'active').toLowerCase() === POLICY_STATUSES.ACTIVE)
+      .reduce((sum, p) => sum + (Number(p.sumAssured) || 0), 0);
+
     return {
       totalPolicies,
       activePolicies,
+      totalSumAssured,
       upcomingPaymentsCount,
       totalPremiumDue,
       paidThisYear,

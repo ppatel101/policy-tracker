@@ -32,6 +32,7 @@ export const AddPolicyScreen = ({ navigation }) => {
   const [companyName, setCompanyName] = useState('');
   const [policyNumber, setPolicyNumber] = useState('');
   const [policyType, setPolicyType] = useState('Life Insurance');
+  const [sumAssured, setSumAssured] = useState('');
   const [premiumAmount, setPremiumAmount] = useState('');
   const [paymentFrequency, setPaymentFrequency] = useState('yearly');
   const [startDate, setStartDate] = useState(todayStr);
@@ -56,11 +57,13 @@ export const AddPolicyScreen = ({ navigation }) => {
 
   const handleSave = async () => {
     setServerError('');
+    const parsedSum = sumAssured.trim() ? parseFloat(sumAssured.replace(/,/g, '')) : null;
     const formValues = {
       policyName,
       companyName,
       policyNumber,
       policyType,
+      sumAssured: parsedSum,
       premiumAmount,
       paymentFrequency,
       startDate,
@@ -174,7 +177,20 @@ export const AddPolicyScreen = ({ navigation }) => {
           </View>
 
           {/* Section: Financials */}
-          <Text style={styles.sectionHeader}>Premium & Schedule</Text>
+          <Text style={styles.sectionHeader}>Coverage & Premium</Text>
+
+          <Input
+            label="Sum Assured (₹) (Optional)"
+            placeholder="e.g. 10,00,000"
+            value={sumAssured}
+            onChangeText={(t) => {
+              setSumAssured(t);
+              if (errors.sumAssured) setErrors((prev) => ({ ...prev, sumAssured: null }));
+            }}
+            keyboardType="numeric"
+            leftIcon={<Ionicons name="shield-outline" size={18} color={colors.textSecondary} />}
+            error={errors.sumAssured}
+          />
 
           <Input
             label="Premium Amount (₹)"

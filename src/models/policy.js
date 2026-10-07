@@ -1,9 +1,16 @@
+import { parseCurrencyInput } from '../utils/currencyUtils';
+
 /**
  * Policy Data Model and Mappers
  * JavaScript uses camelCase, Supabase uses snake_case
  */
 
 export function createPolicyModel(data = {}) {
+  let parsedSum = null;
+  if (data.sumAssured !== undefined && data.sumAssured !== null && data.sumAssured !== '') {
+    parsedSum = typeof data.sumAssured === 'number' ? data.sumAssured : parseCurrencyInput(data.sumAssured);
+  }
+
   return {
     id: data.id || null,
     userId: data.userId || null,
@@ -11,7 +18,8 @@ export function createPolicyModel(data = {}) {
     companyName: data.companyName || '',
     policyNumber: data.policyNumber || '',
     policyType: data.policyType || 'Life Insurance',
-    premiumAmount: Number(data.premiumAmount) || 0,
+    sumAssured: parsedSum,
+    premiumAmount: typeof data.premiumAmount === 'number' ? data.premiumAmount : parseCurrencyInput(data.premiumAmount),
     paymentFrequency: data.paymentFrequency || 'yearly',
     startDate: data.startDate || '',
     endDate: data.endDate || null,
@@ -38,6 +46,7 @@ export function mapRowToPolicy(row) {
     companyName: row.company_name,
     policyNumber: row.policy_number,
     policyType: row.policy_type || 'Life Insurance',
+    sumAssured: row.sum_assured !== undefined && row.sum_assured !== null ? Number(row.sum_assured) : null,
     premiumAmount: Number(row.premium_amount) || 0,
     paymentFrequency: row.payment_frequency || 'yearly',
     startDate: row.start_date,
@@ -58,12 +67,18 @@ export function mapRowToPolicy(row) {
  */
 export function mapPolicyToRow(policy) {
   if (!policy) return null;
+  let parsedSum = null;
+  if (policy.sumAssured !== undefined && policy.sumAssured !== null && policy.sumAssured !== '') {
+    parsedSum = typeof policy.sumAssured === 'number' ? policy.sumAssured : parseCurrencyInput(policy.sumAssured);
+  }
+
   const row = {
     policy_name: policy.policyName,
     company_name: policy.companyName,
     policy_number: policy.policyNumber || null,
     policy_type: policy.policyType || 'Life Insurance',
-    premium_amount: Number(policy.premiumAmount),
+    sum_assured: parsedSum,
+    premium_amount: typeof policy.premiumAmount === 'number' ? policy.premiumAmount : parseCurrencyInput(policy.premiumAmount),
     payment_frequency: policy.paymentFrequency || 'yearly',
     start_date: policy.startDate,
     end_date: policy.endDate || null,

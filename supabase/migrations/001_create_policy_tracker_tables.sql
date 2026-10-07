@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS public.policies (
   company_name TEXT NOT NULL,
   policy_number TEXT,
   policy_type TEXT DEFAULT 'Life Insurance',
+  sum_assured NUMERIC DEFAULT NULL CHECK (sum_assured IS NULL OR sum_assured >= 0),
   premium_amount NUMERIC NOT NULL CHECK (premium_amount > 0),
   payment_frequency TEXT DEFAULT 'yearly' CHECK (payment_frequency IN ('monthly', 'quarterly', 'half-yearly', 'yearly')),
   start_date DATE NOT NULL,
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS public.policies (
 
 -- Policies indexes
 CREATE INDEX IF NOT EXISTS idx_policies_user_id ON public.policies(user_id);
+CREATE INDEX IF NOT EXISTS idx_policies_sum_assured ON public.policies(sum_assured);
 CREATE INDEX IF NOT EXISTS idx_policies_next_due_date ON public.policies(next_due_date);
 CREATE INDEX IF NOT EXISTS idx_policies_status ON public.policies(status);
 

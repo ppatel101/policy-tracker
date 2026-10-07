@@ -14,7 +14,7 @@ import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { PaymentCard } from '../../components/PaymentCard';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { formatCurrency } from '../../utils/currencyUtils';
+import { formatCurrency, formatSumAssured } from '../../utils/currencyUtils';
 import {
   formatDisplayDate,
   calculateRemainingDuration,
@@ -137,6 +137,15 @@ export const PolicyDetailsScreen = ({ route, navigation }) => {
                 <Text style={styles.freqText}> / {policy.paymentFrequency}</Text>
               </Text>
             </View>
+
+            {policy.sumAssured ? (
+              <View>
+                <Text style={styles.highlightLabel}>Sum Assured</Text>
+                <Text style={[styles.premiumValue, { color: colors.success }]}>
+                  {formatSumAssured(policy.sumAssured)}
+                </Text>
+              </View>
+            ) : null}
 
             <View style={styles.alignRight}>
               <Text style={styles.highlightLabel}>Next Due Date</Text>

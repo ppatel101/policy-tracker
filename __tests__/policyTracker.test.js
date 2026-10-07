@@ -4,6 +4,8 @@ import {
   formatIndianNumber,
   formatCurrency,
   parseCurrencyInput,
+  formatSumAssured,
+  formatSumAssuredParts,
 } from '../src/utils/currencyUtils';
 
 import {
@@ -30,7 +32,7 @@ import {
   validatePhone,
 } from '../src/utils/validation';
 
-import { mapRowToPolicy, mapPolicyToRow } from '../src/models/policy';
+import { createPolicyModel, mapRowToPolicy, mapPolicyToRow } from '../src/models/policy';
 import { mapRowToPayment, mapPaymentToRow } from '../src/models/payment';
 import { PAYMENT_STATUSES, POLICY_STATUSES } from '../src/utils/constants';
 
@@ -57,6 +59,30 @@ describe('Currency Utilities (Indian Number Formatting)', () => {
     expect(parseCurrencyInput('₹25,000')).toBe(25000);
     expect(parseCurrencyInput('1,20,000')).toBe(120000);
     expect(parseCurrencyInput('')).toBe(0);
+  });
+
+  it('formats sum assured into compact Indian units (Lakhs, Crores)', () => {
+    expect(formatSumAssured(1000000)).toBe('₹10 Lakhs');
+    expect(formatSumAssured(100000)).toBe('₹1 Lakh');
+    expect(formatSumAssured(1250000)).toBe('₹12.5 Lakhs');
+    expect(formatSumAssured(10000000)).toBe('₹1 Crore');
+    expect(formatSumAssured(15000000)).toBe('₹1.5 Crores');
+    expect(formatSumAssured(50000)).toBe('₹50,000');
+  });
+
+  it('breaks down sum assured into value and unit parts', () => {
+    const parts10L = formatSumAssuredParts(1000000);
+    expect(parts10L.value).toBe('10');
+    expect(parts10L.unit).toBe('Lakhs');
+    expect(parts10L.fullText).toBe('₹10 Lakhs');
+
+    const parts = formatSumAssuredParts(1250000);
+    expect(parts.value).toBe('12.5');
+    expect(parts.unit).toBe('Lakhs');
+
+    const parts1Cr = formatSumAssuredParts(10000000);
+    expect(parts1Cr.value).toBe('1');
+    expect(parts1Cr.unit).toBe('Crore');
   });
 });
 
@@ -264,6 +290,27 @@ describe('Form Validations', () => {
     expect(validatePhone('123')).toBe('Please enter a valid 10-digit phone number');
     expect(validatePhone('')).toBeNull(); // optional
   });
+
+  it('validates sumAssured field if provided', () => {
+    const validWithSum = {
+      policyName: 'HDFC Life Sanchay',
+      companyName: 'HDFC Life',
+      premiumAmount: 50000,
+      startDate: '2026-10-01',
+      durationYears: 10,
+      nextDueDate: '2026-10-01',
+      sumAssured: '10,00,000',
+    };
+    expect(validatePolicyForm(validWithSum).isValid).toBe(true);
+
+    const invalidWithSum = {
+      ...validWithSum,
+      sumAssured: -500,
+    };
+    const invalidResult = validatePolicyForm(invalidWithSum);
+    expect(invalidResult.isValid).toBe(false);
+    expect(invalidResult.errors.sumAssured).toBeDefined();
+  });
 });
 
 describe('Model Mappings (camelCase <-> snake_case)', () => {
@@ -275,6 +322,7 @@ describe('Model Mappings (camelCase <-> snake_case)', () => {
       company_name: 'LIC',
       policy_number: 'LIC1001',
       policy_type: 'Term Insurance',
+      sum_assured: '1000000',
       premium_amount: '25000',
       payment_frequency: 'yearly',
       start_date: '2026-10-01',
@@ -292,6 +340,7 @@ describe('Model Mappings (camelCase <-> snake_case)', () => {
     expect(policy.userId).toBe('usr-456');
     expect(policy.policyName).toBe('LIC Tech Term');
     expect(policy.companyName).toBe('LIC');
+    expect(policy.sumAssured).toBe(1000000);
     expect(policy.premiumAmount).toBe(25000);
     expect(policy.paymentFrequency).toBe('yearly');
     expect(policy.durationYears).toBe(30);
@@ -305,6 +354,7 @@ describe('Model Mappings (camelCase <-> snake_case)', () => {
       companyName: 'Star Health',
       policyNumber: 'STAR999',
       policyType: 'Health Insurance',
+      sumAssured: 2500000,
       premiumAmount: 18000,
       paymentFrequency: 'yearly',
       startDate: '2026-10-01',
@@ -318,8 +368,25 @@ describe('Model Mappings (camelCase <-> snake_case)', () => {
     const row = mapPolicyToRow(policy);
     expect(row.policy_name).toBe('Star Health Optima');
     expect(row.company_name).toBe('Star Health');
+    expect(row.sum_assured).toBe(2500000);
     expect(row.premium_amount).toBe(18000);
     expect(row.user_id).toBe('usr-456');
+  });
+
+  it('correctly maps and parses sumAssured with comma strings and numbers in createPolicyModel', () => {
+    const model = createPolicyModel({
+      policyName: 'Max Life Smart',
+      companyName: 'Max Life',
+      sumAssured: '10,00,000',
+      premiumAmount: '20,000',
+    });
+    expect(model.sumAssured).toBe(1000000);
+    expect(model.premiumAmount).toBe(20000);
+
+    const row = mapPolicyToRow(model);
+    expect(row.sum_assured).toBe(1000000);
+    const remapped = mapRowToPolicy(row);
+    expect(remapped.sumAssured).toBe(1000000);
   });
 
   it('maps payment rows bidirectional', () => {

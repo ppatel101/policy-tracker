@@ -44,6 +44,16 @@ export function validatePolicyForm(values) {
     }
   }
 
+  if (values.sumAssured !== undefined && values.sumAssured !== null && values.sumAssured !== '') {
+    const sumAssuredNum =
+      typeof values.sumAssured === 'number'
+        ? values.sumAssured
+        : parseFloat(String(values.sumAssured).replace(/,/g, ''));
+    if (isNaN(sumAssuredNum) || sumAssuredNum < 0) {
+      errors.sumAssured = 'Sum assured must be a valid positive amount';
+    }
+  }
+
   return {
     isValid: Object.keys(errors).length === 0,
     errors,

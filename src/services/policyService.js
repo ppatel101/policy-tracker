@@ -25,7 +25,22 @@ export const policyService = {
 
         if (error) throw error;
 
-        const policies = (data || []).map(mapRowToPolicy);
+        const cachedPolicies = await localStorage.getCachedPolicies();
+        const cachedMap = new Map((cachedPolicies || []).map((p) => [p.id, p]));
+
+        const policies = (data || []).map((row) => {
+          const mapped = mapRowToPolicy(row);
+          const cached = cachedMap.get(mapped.id);
+          if (
+            (mapped.sumAssured === null || mapped.sumAssured === undefined) &&
+            cached &&
+            cached.sumAssured !== null &&
+            cached.sumAssured !== undefined
+          ) {
+            mapped.sumAssured = cached.sumAssured;
+          }
+          return mapped;
+        });
         await localStorage.setCachedPolicies(policies);
         return { policies, fromCache: false, error: null };
       }
@@ -66,6 +81,13 @@ export const policyService = {
           .order('due_date', { ascending: true });
 
         const policy = mapRowToPolicy(policyData);
+        if (policy && (policy.sumAssured === null || policy.sumAssured === undefined)) {
+          const allCached = await localStorage.getCachedPolicies();
+          const cached = (allCached || []).find((p) => p.id === policyId);
+          if (cached && cached.sumAssured !== null && cached.sumAssured !== undefined) {
+            policy.sumAssured = cached.sumAssured;
+          }
+        }
         const payments = (paymentsData || []).map(mapRowToPayment);
 
         return { policy, payments, error: null };
@@ -118,9 +140,20 @@ export const policyService = {
     if (isSupabaseConfigured() && userId) {
       try {
         const policyRow = mapPolicyToRow(policy);
-        const { error: insertPolicyError } = await supabase
+        let { error: insertPolicyError } = await supabase
           .from('policies')
           .insert(policyRow);
+
+        const insertErrMsg = insertPolicyError
+          ? `${insertPolicyError.message || ''} ${insertPolicyError.details || ''} ${insertPolicyError.hint || ''}`.toLowerCase()
+          : '';
+
+        if (insertPolicyError && (insertErrMsg.includes('sum_assured') || insertPolicyError.code === 'PGRST204')) {
+          const fallbackRow = { ...policyRow };
+          delete fallbackRow.sum_assured;
+          const retry = await supabase.from('policies').insert(fallbackRow);
+          insertPolicyError = retry.error;
+        }
 
         if (insertPolicyError) throw insertPolicyError;
 
@@ -185,11 +218,26 @@ export const policyService = {
     if (isSupabaseConfigured() && userId) {
       try {
         const row = mapPolicyToRow(updatedPolicy);
-        const { error } = await supabase
+        let { error } = await supabase
           .from('policies')
           .update(row)
           .eq('id', policyId)
           .eq('user_id', userId);
+
+        const updateErrMsg = error
+          ? `${error.message || ''} ${error.details || ''} ${error.hint || ''}`.toLowerCase()
+          : '';
+
+        if (error && (updateErrMsg.includes('sum_assured') || error.code === 'PGRST204')) {
+          const fallbackRow = { ...row };
+          delete fallbackRow.sum_assured;
+          const retry = await supabase
+            .from('policies')
+            .update(fallbackRow)
+            .eq('id', policyId)
+            .eq('user_id', userId);
+          error = retry.error;
+        }
 
         if (error) throw error;
         savedRemotely = true;

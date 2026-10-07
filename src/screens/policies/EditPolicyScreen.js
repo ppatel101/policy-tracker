@@ -33,6 +33,9 @@ export const EditPolicyScreen = ({ route, navigation }) => {
   const [companyName, setCompanyName] = useState(currentPolicy?.companyName || '');
   const [policyNumber, setPolicyNumber] = useState(currentPolicy?.policyNumber || '');
   const [policyType, setPolicyType] = useState(currentPolicy?.policyType || 'Life Insurance');
+  const [sumAssured, setSumAssured] = useState(
+    currentPolicy?.sumAssured != null ? String(currentPolicy.sumAssured) : ''
+  );
   const [premiumAmount, setPremiumAmount] = useState(String(currentPolicy?.premiumAmount || ''));
   const [paymentFrequency, setPaymentFrequency] = useState(currentPolicy?.paymentFrequency || 'yearly');
   const [startDate, setStartDate] = useState(currentPolicy?.startDate || '');
@@ -51,11 +54,13 @@ export const EditPolicyScreen = ({ route, navigation }) => {
 
   const handleUpdate = async () => {
     setServerError('');
+    const parsedSum = sumAssured.trim() ? parseFloat(sumAssured.replace(/,/g, '')) : null;
     const formValues = {
       policyName,
       companyName,
       policyNumber,
       policyType,
+      sumAssured: parsedSum,
       premiumAmount,
       paymentFrequency,
       startDate,
@@ -198,7 +203,20 @@ export const EditPolicyScreen = ({ route, navigation }) => {
             </View>
           </View>
 
-          <Text style={styles.sectionHeader}>Premium & Schedule</Text>
+          <Text style={styles.sectionHeader}>Coverage & Premium</Text>
+
+          <Input
+            label="Sum Assured (₹) (Optional)"
+            placeholder="e.g. 10,00,000"
+            value={sumAssured}
+            onChangeText={(t) => {
+              setSumAssured(t);
+              if (errors.sumAssured) setErrors((prev) => ({ ...prev, sumAssured: null }));
+            }}
+            keyboardType="numeric"
+            leftIcon={<Ionicons name="shield-outline" size={18} color={colors.textSecondary} />}
+            error={errors.sumAssured}
+          />
 
           <Input
             label="Premium Amount (₹)"

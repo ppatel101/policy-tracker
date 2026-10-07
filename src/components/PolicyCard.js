@@ -5,7 +5,7 @@ import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { borderRadius, spacing } from '../theme/spacing';
 import { Badge } from './Badge';
-import { formatCurrency } from '../utils/currencyUtils';
+import { formatCurrency, formatSumAssured } from '../utils/currencyUtils';
 import { formatDisplayDate, calculateRemainingDuration } from '../utils/dateUtils';
 import { POLICY_STATUSES } from '../utils/constants';
 
@@ -65,6 +65,15 @@ export const PolicyCard = ({ policy, onPress, style }) => {
           </Text>
         </View>
 
+        {policy.sumAssured ? (
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>Sum Assured</Text>
+            <Text style={[styles.detailValue, styles.sumAssuredValue]}>
+              {formatSumAssured(policy.sumAssured)}
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.detailItem}>
           <Text style={styles.detailLabel}>Next Due</Text>
           <Text style={styles.detailValue}>
@@ -72,12 +81,14 @@ export const PolicyCard = ({ policy, onPress, style }) => {
           </Text>
         </View>
 
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Duration</Text>
-          <Text style={[styles.detailValue, remainingDurationText === 'Policy expired' && styles.expiredText]} numberOfLines={1}>
-            {remainingDurationText}
-          </Text>
-        </View>
+        {!policy.sumAssured && (
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>Duration</Text>
+            <Text style={[styles.detailValue, remainingDurationText === 'Policy expired' && styles.expiredText]} numberOfLines={1}>
+              {remainingDurationText}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.footerRow}>
@@ -155,6 +166,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontWeight: '600',
     fontSize: 13,
+  },
+  sumAssuredValue: {
+    color: colors.success,
+    fontWeight: '700',
   },
   expiredText: {
     color: colors.danger,
