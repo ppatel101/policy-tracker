@@ -6,8 +6,9 @@ import { notificationService } from '../services/notificationService';
 import { localStorage } from '../storage/localStorage';
 import { useAuth } from './AuthContext';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
-import { getFinancialYear, isDateInFinancialYear } from '../utils/dateUtils';
-import { POLICY_STATUSES, PAYMENT_STATUSES } from '../utils/constants';
+import { getFinancialYear, isDateInFinancialYear, calculateEndDate, formatDate } from '../utils/dateUtils';
+import { generateUUID } from '../utils/uuid';
+import { POLICY_STATUSES, PAYMENT_STATUSES, isAnnualRenewablePolicy } from '../utils/constants';
 
 const PolicyContext = createContext(null);
 
@@ -179,6 +180,75 @@ export const PolicyProvider = ({ children }) => {
     return result;
   }, [user]);
 
+  // Renew Policy Action (for Health Insurance / Annual Renewable policies)
+  const renewPolicy = useCallback(async (policyId, renewalData = {}) => {
+    const userId = user?.id || 'local_user';
+    const policy = policies.find((p) => p.id === policyId);
+    if (!policy) return { error: 'Policy not found' };
+
+    const oldEndDate = policy.endDate || policy.startDate;
+    const newStartDate = oldEndDate;
+    const newEndDate = calculateEndDate(newStartDate, 1);
+    const renewalPremium = renewalData.premiumAmount !== undefined && renewalData.premiumAmount !== ''
+      ? Number(renewalData.premiumAmount)
+      : Number(policy.premiumAmount);
+
+    // 1. Record the renewal payment as paid
+    const renewalPayment = {
+      id: generateUUID(),
+      policyId,
+      userId,
+      installmentNumber: (payments.filter((p) => p.policyId === policyId).length || 0) + 1,
+      dueDate: newStartDate,
+      paidDate: formatDate(new Date()),
+      amount: renewalPremium,
+      paidAmount: renewalPremium,
+      status: PAYMENT_STATUSES.PAID,
+      note: `Annual Renewal (${newStartDate.slice(0, 4)}–${newEndDate.slice(0, 4)})`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // 2. Next due payment for upcoming year
+    const nextDuePayment = {
+      id: generateUUID(),
+      policyId,
+      userId,
+      installmentNumber: renewalPayment.installmentNumber + 1,
+      dueDate: newEndDate,
+      paidDate: null,
+      amount: renewalPremium,
+      paidAmount: null,
+      status: PAYMENT_STATUSES.UPCOMING,
+      note: `Renewal Due (${newEndDate.slice(0, 4)})`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Update policy fields
+    const policyUpdates = {
+      startDate: newStartDate,
+      endDate: newEndDate,
+      nextDueDate: newEndDate,
+      premiumAmount: renewalPremium,
+      status: POLICY_STATUSES.ACTIVE,
+    };
+
+    const updateRes = await policyService.updatePolicy(policyId, policyUpdates, userId);
+
+    // Save payments locally
+    const cachedPayments = await localStorage.getCachedPayments();
+    const newPayments = [renewalPayment, nextDuePayment, ...cachedPayments];
+    await localStorage.setCachedPayments(newPayments);
+
+    if (updateRes.policy) {
+      setPolicies((prev) => prev.map((p) => (p.id === policyId ? updateRes.policy : p)));
+    }
+    setPayments((prev) => [renewalPayment, nextDuePayment, ...prev]);
+
+    return { success: true, policy: updateRes.policy, payment: renewalPayment };
+  }, [policies, payments, user]);
+
   // Manual trigger for sync
   const manualSync = useCallback(async () => {
     if (!user?.id || syncing) return;
@@ -220,8 +290,13 @@ export const PolicyProvider = ({ children }) => {
       })
       .reduce((sum, p) => sum + (Number(p.paidAmount || p.amount) || 0), 0);
 
+    // Total Sum Assured on dashboard: Only Life, Term, Endowment etc. (Health and Vehicle excluded)
     const totalSumAssured = policies
-      .filter((p) => (p.status || 'active').toLowerCase() === POLICY_STATUSES.ACTIVE)
+      .filter((p) => {
+        const isActive = (p.status || 'active').toLowerCase() === POLICY_STATUSES.ACTIVE;
+        const isHealthOrVehicle = isAnnualRenewablePolicy(p.policyType);
+        return isActive && !isHealthOrVehicle;
+      })
       .reduce((sum, p) => sum + (Number(p.sumAssured) || 0), 0);
 
     const totalPremiumThisYear = paidThisYear + totalPremiumDue;
@@ -298,6 +373,7 @@ export const PolicyProvider = ({ children }) => {
     updatePolicy,
     deletePolicy,
     markPaymentPaid,
+    renewPolicy,
     manualSync,
   };
 

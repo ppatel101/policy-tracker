@@ -11,6 +11,17 @@ export function createPolicyModel(data = {}) {
     parsedSum = typeof data.sumAssured === 'number' ? data.sumAssured : parseCurrencyInput(data.sumAssured);
   }
 
+  let coveredMembers = [];
+  if (Array.isArray(data.coveredMembers)) {
+    coveredMembers = data.coveredMembers;
+  } else if (typeof data.coveredMembers === 'string') {
+    try {
+      coveredMembers = JSON.parse(data.coveredMembers);
+    } catch {
+      coveredMembers = [];
+    }
+  }
+
   return {
     id: data.id || null,
     userId: data.userId || null,
@@ -19,6 +30,8 @@ export function createPolicyModel(data = {}) {
     policyNumber: data.policyNumber || '',
     policyType: data.policyType || 'Life Insurance',
     sumAssured: parsedSum,
+    tpaName: data.tpaName || '',
+    coveredMembers: Array.isArray(coveredMembers) ? coveredMembers : [],
     premiumAmount: typeof data.premiumAmount === 'number' ? data.premiumAmount : parseCurrencyInput(data.premiumAmount),
     paymentFrequency: data.paymentFrequency || 'yearly',
     startDate: data.startDate || '',
@@ -39,6 +52,18 @@ export function createPolicyModel(data = {}) {
  */
 export function mapRowToPolicy(row) {
   if (!row) return null;
+
+  let coveredMembers = [];
+  if (Array.isArray(row.covered_members)) {
+    coveredMembers = row.covered_members;
+  } else if (typeof row.covered_members === 'string') {
+    try {
+      coveredMembers = JSON.parse(row.covered_members);
+    } catch {
+      coveredMembers = [];
+    }
+  }
+
   return {
     id: row.id,
     userId: row.user_id,
@@ -47,6 +72,8 @@ export function mapRowToPolicy(row) {
     policyNumber: row.policy_number,
     policyType: row.policy_type || 'Life Insurance',
     sumAssured: row.sum_assured !== undefined && row.sum_assured !== null ? Number(row.sum_assured) : null,
+    tpaName: row.tpa_name || '',
+    coveredMembers: Array.isArray(coveredMembers) ? coveredMembers : [],
     premiumAmount: Number(row.premium_amount) || 0,
     paymentFrequency: row.payment_frequency || 'yearly',
     startDate: row.start_date,
@@ -78,6 +105,8 @@ export function mapPolicyToRow(policy) {
     policy_number: policy.policyNumber || null,
     policy_type: policy.policyType || 'Life Insurance',
     sum_assured: parsedSum,
+    tpa_name: policy.tpaName || null,
+    covered_members: policy.coveredMembers && policy.coveredMembers.length > 0 ? JSON.stringify(policy.coveredMembers) : null,
     premium_amount: typeof policy.premiumAmount === 'number' ? policy.premiumAmount : parseCurrencyInput(policy.premiumAmount),
     payment_frequency: policy.paymentFrequency || 'yearly',
     start_date: policy.startDate,

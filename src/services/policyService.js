@@ -31,13 +31,14 @@ export const policyService = {
         const policies = (data || []).map((row) => {
           const mapped = mapRowToPolicy(row);
           const cached = cachedMap.get(mapped.id);
-          if (
-            (mapped.sumAssured === null || mapped.sumAssured === undefined) &&
-            cached &&
-            cached.sumAssured !== null &&
-            cached.sumAssured !== undefined
-          ) {
-            mapped.sumAssured = cached.sumAssured;
+          if (cached) {
+            if ((mapped.sumAssured === null || mapped.sumAssured === undefined) && cached.sumAssured != null) {
+              mapped.sumAssured = cached.sumAssured;
+            }
+            if (!mapped.tpaName && cached.tpaName) mapped.tpaName = cached.tpaName;
+            if ((!mapped.coveredMembers || mapped.coveredMembers.length === 0) && cached.coveredMembers?.length > 0) {
+              mapped.coveredMembers = cached.coveredMembers;
+            }
           }
           return mapped;
         });
@@ -81,11 +82,17 @@ export const policyService = {
           .order('due_date', { ascending: true });
 
         const policy = mapRowToPolicy(policyData);
-        if (policy && (policy.sumAssured === null || policy.sumAssured === undefined)) {
+        if (policy) {
           const allCached = await localStorage.getCachedPolicies();
           const cached = (allCached || []).find((p) => p.id === policyId);
-          if (cached && cached.sumAssured !== null && cached.sumAssured !== undefined) {
-            policy.sumAssured = cached.sumAssured;
+          if (cached) {
+            if ((policy.sumAssured === null || policy.sumAssured === undefined) && cached.sumAssured != null) {
+              policy.sumAssured = cached.sumAssured;
+            }
+            if (!policy.tpaName && cached.tpaName) policy.tpaName = cached.tpaName;
+            if ((!policy.coveredMembers || policy.coveredMembers.length === 0) && cached.coveredMembers?.length > 0) {
+              policy.coveredMembers = cached.coveredMembers;
+            }
           }
         }
         const payments = (paymentsData || []).map(mapRowToPayment);
@@ -148,9 +155,11 @@ export const policyService = {
           ? `${insertPolicyError.message || ''} ${insertPolicyError.details || ''} ${insertPolicyError.hint || ''}`.toLowerCase()
           : '';
 
-        if (insertPolicyError && (insertErrMsg.includes('sum_assured') || insertPolicyError.code === 'PGRST204')) {
+        if (insertPolicyError && (insertErrMsg.includes('sum_assured') || insertErrMsg.includes('covered_members') || insertErrMsg.includes('tpa') || insertPolicyError.code === 'PGRST204')) {
           const fallbackRow = { ...policyRow };
           delete fallbackRow.sum_assured;
+          delete fallbackRow.tpa_name;
+          delete fallbackRow.covered_members;
           const retry = await supabase.from('policies').insert(fallbackRow);
           insertPolicyError = retry.error;
         }
@@ -228,9 +237,11 @@ export const policyService = {
           ? `${error.message || ''} ${error.details || ''} ${error.hint || ''}`.toLowerCase()
           : '';
 
-        if (error && (updateErrMsg.includes('sum_assured') || error.code === 'PGRST204')) {
+        if (error && (updateErrMsg.includes('sum_assured') || updateErrMsg.includes('covered_members') || updateErrMsg.includes('tpa') || error.code === 'PGRST204')) {
           const fallbackRow = { ...row };
           delete fallbackRow.sum_assured;
+          delete fallbackRow.tpa_name;
+          delete fallbackRow.covered_members;
           const retry = await supabase
             .from('policies')
             .update(fallbackRow)

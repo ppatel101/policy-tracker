@@ -3,11 +3,6 @@ export const POLICY_TYPES = [
   'Health Insurance',
   'Vehicle Insurance',
   'Term Insurance',
-  'Home Insurance',
-  'Travel Insurance',
-  'Child Education Plan',
-  'Pension / Retirement',
-  'Other',
 ];
 
 export const PAYMENT_FREQUENCIES = [
@@ -68,3 +63,78 @@ export const PAYMENT_FILTERS = [
   { id: 'overdue', label: 'Overdue' },
   { id: 'paid', label: 'Paid' },
 ];
+
+export const FAMILY_RELATIONS = [
+  'Self',
+  'Spouse',
+  'Son',
+  'Daughter',
+  'Father',
+  'Mother',
+  'Brother',
+  'Sister',
+  'Other',
+];
+
+/**
+ * Checks whether a policy type is Health Insurance (Mediclaim)
+ * @param {string} policyType
+ * @returns {boolean}
+ */
+export const isHealthPolicy = (policyType) => {
+  if (!policyType) return false;
+  const lower = String(policyType).toLowerCase();
+  return lower.includes('health') || lower.includes('mediclaim');
+};
+
+/**
+ * Checks whether a policy type is Vehicle / Motor Insurance
+ * @param {string} policyType
+ * @returns {boolean}
+ */
+export const isVehiclePolicy = (policyType) => {
+  if (!policyType) return false;
+  const lower = String(policyType).toLowerCase();
+  return lower.includes('vehicle') || lower.includes('motor') || lower.includes('car') || lower.includes('bike') || lower.includes('auto');
+};
+
+/**
+ * Checks whether a policy type is an Annual Renewable Policy (1-year cycle: Health or Vehicle)
+ * @param {string} policyType
+ * @returns {boolean}
+ */
+export const isAnnualRenewablePolicy = (policyType) => {
+  return isHealthPolicy(policyType) || isVehiclePolicy(policyType);
+};
+
+/**
+ * Returns the contextual label for the coverage amount (Sum Assured / Health Coverage / Vehicle IDV)
+ * @param {string} policyType
+ * @returns {string}
+ */
+export const getCoverageLabel = (policyType) => {
+  if (isVehiclePolicy(policyType)) {
+    return 'IDV (Insured Declared Value)';
+  }
+  if (isHealthPolicy(policyType)) {
+    return 'Coverage (Sum Insured)';
+  }
+  return 'Sum Assured';
+};
+
+/**
+ * Returns a compact label for cards and badges (IDV / Coverage / Sum Assured)
+ * @param {string} policyType
+ * @returns {string}
+ */
+export const getCoverageShortLabel = (policyType) => {
+  if (isVehiclePolicy(policyType)) {
+    return 'IDV';
+  }
+  if (isHealthPolicy(policyType)) {
+    return 'Coverage';
+  }
+  return 'Sum Assured';
+};
+
+

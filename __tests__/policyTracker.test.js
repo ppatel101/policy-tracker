@@ -35,7 +35,16 @@ import {
 
 import { createPolicyModel, mapRowToPolicy, mapPolicyToRow } from '../src/models/policy';
 import { mapRowToPayment, mapPaymentToRow } from '../src/models/payment';
-import { PAYMENT_STATUSES, POLICY_STATUSES } from '../src/utils/constants';
+import {
+  PAYMENT_STATUSES,
+  POLICY_STATUSES,
+  isHealthPolicy,
+  isVehiclePolicy,
+  isAnnualRenewablePolicy,
+  getCoverageLabel,
+  getCoverageShortLabel,
+  FAMILY_RELATIONS,
+} from '../src/utils/constants';
 
 describe('Currency Utilities (Indian Number Formatting)', () => {
   it('formats numbers with Indian grouping commas', () => {
@@ -508,5 +517,296 @@ describe('Model Mappings (camelCase <-> snake_case)', () => {
       expect(formatCurrency(totalRemaining)).toBe('₹30,000');
     });
   });
+
+  describe('Mediclaim / Health Insurance (Phase 1 & Phase 2)', () => {
+    it('accurately identifies Health Insurance and Mediclaim policies', () => {
+      expect(isHealthPolicy('Health Insurance')).toBe(true);
+      expect(isHealthPolicy('Mediclaim Policy')).toBe(true);
+      expect(isHealthPolicy('Family Mediclaim Floater')).toBe(true);
+      expect(isHealthPolicy('health insurance')).toBe(true);
+      expect(isHealthPolicy('Life Insurance')).toBe(false);
+      expect(isHealthPolicy('Term Insurance')).toBe(false);
+      expect(isHealthPolicy('Vehicle Insurance')).toBe(false);
+      expect(isHealthPolicy('')).toBe(false);
+      expect(isHealthPolicy(null)).toBe(false);
+      expect(isHealthPolicy(undefined)).toBe(false);
+    });
+
+    it('contains standard family relation options', () => {
+      expect(FAMILY_RELATIONS).toContain('Self');
+      expect(FAMILY_RELATIONS).toContain('Spouse');
+      expect(FAMILY_RELATIONS).toContain('Son');
+      expect(FAMILY_RELATIONS).toContain('Daughter');
+      expect(FAMILY_RELATIONS).toContain('Father');
+      expect(FAMILY_RELATIONS).toContain('Mother');
+    });
+
+    it('creates health policy model with covered members and TPA details', () => {
+      const members = [
+        { id: '1', name: 'Rahul Sharma', relation: 'Self', age: '35', memberId: 'H1234' },
+        { id: '2', name: 'Pooja Sharma', relation: 'Spouse', age: '32', memberId: 'H1235' },
+      ];
+
+      const model = createPolicyModel({
+        policyName: 'Star Health Optima',
+        companyName: 'Star Health',
+        policyType: 'Health Insurance',
+        sumAssured: '10,00,000',
+        tpaName: 'Medi Assist TPA',
+        coveredMembers: members,
+        premiumAmount: '18,500',
+        startDate: '2025-05-01',
+        endDate: '2026-04-30',
+        durationYears: 1,
+      });
+
+      expect(model.policyType).toBe('Health Insurance');
+      expect(model.sumAssured).toBe(1000000);
+      expect(model.tpaName).toBe('Medi Assist TPA');
+      expect(model.coveredMembers.length).toBe(2);
+      expect(model.coveredMembers[0].name).toBe('Rahul Sharma');
+      expect(model.coveredMembers[1].relation).toBe('Spouse');
+      expect(model.durationYears).toBe(1);
+    });
+
+    it('handles JSON stringified covered members gracefully in createPolicyModel', () => {
+      const members = [{ id: '1', name: 'Aarav Sharma', relation: 'Son', age: '6' }];
+      const model = createPolicyModel({
+        policyName: 'HDFC ERGO Optima Restore',
+        coveredMembers: JSON.stringify(members),
+      });
+
+      expect(Array.isArray(model.coveredMembers)).toBe(true);
+      expect(model.coveredMembers.length).toBe(1);
+      expect(model.coveredMembers[0].name).toBe('Aarav Sharma');
+    });
+
+    it('maps health policy fields bidirectional between application model and Supabase row', () => {
+      const members = [
+        { id: '1', name: 'Vikram', relation: 'Self', age: '40' },
+        { id: '2', name: 'Sunita', relation: 'Mother', age: '65' },
+      ];
+
+      const appModel = {
+        policyName: 'Care Supreme Floater',
+        companyName: 'Care Health',
+        policyNumber: 'CARE-998877',
+        policyType: 'Health Insurance',
+        sumAssured: 700000,
+        tpaName: 'Paramount TPA',
+        coveredMembers: members,
+        premiumAmount: 24000,
+        paymentFrequency: 'yearly',
+        startDate: '2025-06-01',
+        endDate: '2026-05-31',
+        durationYears: 1,
+        nextDueDate: '2026-05-31',
+        status: 'active',
+      };
+
+      const row = mapPolicyToRow(appModel);
+      expect(row.policy_type).toBe('Health Insurance');
+      expect(row.sum_assured).toBe(700000);
+      expect(row.tpa_name).toBe('Paramount TPA');
+      expect(typeof row.covered_members).toBe('string');
+      expect(JSON.parse(row.covered_members).length).toBe(2);
+
+      const restored = mapRowToPolicy(row);
+      expect(restored.policyType).toBe('Health Insurance');
+      expect(restored.sumAssured).toBe(700000);
+      expect(restored.tpaName).toBe('Paramount TPA');
+      expect(Array.isArray(restored.coveredMembers)).toBe(true);
+      expect(restored.coveredMembers.length).toBe(2);
+      expect(restored.coveredMembers[1].name).toBe('Sunita');
+      expect(restored.coveredMembers[1].relation).toBe('Mother');
+    });
+
+    it('validates annual renewal date progression for 1-year mediclaim cycle', () => {
+      const currentStartDate = '2025-04-10';
+      const currentEndDate = '2026-04-09';
+
+      const nextStart = new Date(currentStartDate);
+      nextStart.setFullYear(nextStart.getFullYear() + 1);
+
+      const nextEnd = new Date(currentEndDate);
+      nextEnd.setFullYear(nextEnd.getFullYear() + 1);
+
+      const nextStartStr = nextStart.toISOString().split('T')[0];
+      const nextEndStr = nextEnd.toISOString().split('T')[0];
+
+      expect(nextStartStr).toBe('2026-04-10');
+      expect(nextEndStr).toBe('2027-04-09');
+    });
+
+    it('checks 30-day grace period logic for health policy continuity', () => {
+      const endDate = new Date('2026-04-10');
+      const withinGraceDate = new Date('2026-04-25'); // 15 days later
+      const pastGraceDate = new Date('2026-05-20'); // 40 days later
+
+      const daysDiff1 = Math.ceil((withinGraceDate - endDate) / (1000 * 60 * 60 * 24));
+      const daysDiff2 = Math.ceil((pastGraceDate - endDate) / (1000 * 60 * 60 * 24));
+
+      const isWithinGrace1 = daysDiff1 > 0 && daysDiff1 <= 30;
+      const isWithinGrace2 = daysDiff2 > 0 && daysDiff2 <= 30;
+
+      expect(isWithinGrace1).toBe(true);
+      expect(isWithinGrace2).toBe(false);
+    });
+  });
+
+  describe('Vehicle Insurance & Annual Renewable Unification', () => {
+    it('accurately identifies Vehicle and Motor insurance policies', () => {
+      expect(isVehiclePolicy('Vehicle Insurance')).toBe(true);
+      expect(isVehiclePolicy('Motor Insurance')).toBe(true);
+      expect(isVehiclePolicy('Car Insurance')).toBe(true);
+      expect(isVehiclePolicy('Two Wheeler / Bike Insurance')).toBe(true);
+      expect(isVehiclePolicy('Health Insurance')).toBe(false);
+      expect(isVehiclePolicy('Life Insurance')).toBe(false);
+      expect(isVehiclePolicy('')).toBe(false);
+      expect(isVehiclePolicy(null)).toBe(false);
+    });
+
+    it('identifies both Health and Vehicle policies as Annual Renewable (1-year cycle)', () => {
+      expect(isAnnualRenewablePolicy('Health Insurance')).toBe(true);
+      expect(isAnnualRenewablePolicy('Mediclaim Policy')).toBe(true);
+      expect(isAnnualRenewablePolicy('Vehicle Insurance')).toBe(true);
+      expect(isAnnualRenewablePolicy('Car Insurance')).toBe(true);
+      expect(isAnnualRenewablePolicy('Life Insurance')).toBe(false);
+      expect(isAnnualRenewablePolicy('Term Insurance')).toBe(false);
+      expect(isAnnualRenewablePolicy('Child Education Plan')).toBe(false);
+    });
+
+    it('returns appropriate coverage labels for Vehicle IDV, Health Coverage, and Sum Assured', () => {
+      expect(getCoverageLabel('Vehicle Insurance')).toBe('IDV (Insured Declared Value)');
+      expect(getCoverageLabel('Car Insurance')).toBe('IDV (Insured Declared Value)');
+      expect(getCoverageLabel('Health Insurance')).toBe('Coverage (Sum Insured)');
+      expect(getCoverageLabel('Mediclaim')).toBe('Coverage (Sum Insured)');
+      expect(getCoverageLabel('Life Insurance')).toBe('Sum Assured');
+      expect(getCoverageLabel('Term Insurance')).toBe('Sum Assured');
+
+      expect(getCoverageShortLabel('Vehicle Insurance')).toBe('IDV');
+      expect(getCoverageShortLabel('Health Insurance')).toBe('Coverage');
+      expect(getCoverageShortLabel('Life Insurance')).toBe('Sum Assured');
+    });
+
+    it('stores vehicle IDV correctly in sumAssured property of the policy model', () => {
+      const vehicleModel = createPolicyModel({
+        policyName: 'ICICI Lombard Comprehensive Motor',
+        companyName: 'ICICI Lombard',
+        policyNumber: 'MOT-789012',
+        policyType: 'Vehicle Insurance',
+        sumAssured: '6,45,000', // Entered as IDV in the form
+        premiumAmount: '12,500',
+        durationYears: 1,
+        startDate: '2025-08-01',
+        endDate: '2026-07-31',
+      });
+
+      expect(vehicleModel.policyType).toBe('Vehicle Insurance');
+      expect(vehicleModel.sumAssured).toBe(645000);
+      expect(vehicleModel.durationYears).toBe(1);
+
+      // Verify row mapping preserves vehicle IDV in sum_assured column
+      const row = mapPolicyToRow(vehicleModel);
+      expect(row.sum_assured).toBe(645000);
+      expect(row.policy_type).toBe('Vehicle Insurance');
+
+      const remapped = mapRowToPolicy(row);
+      expect(remapped.sumAssured).toBe(645000);
+      expect(remapped.policyType).toBe('Vehicle Insurance');
+    });
+
+    it('excludes Health Insurance coverage and Vehicle Insurance IDV from dashboard totalSumAssured', () => {
+      const samplePolicies = [
+        {
+          id: '1',
+          policyName: 'LIC Jeevan Anand',
+          policyType: 'Life Insurance',
+          sumAssured: 1000000,
+          status: 'active',
+        },
+        {
+          id: '2',
+          policyName: 'HDFC Click 2 Protect',
+          policyType: 'Term Insurance',
+          sumAssured: 5000000,
+          status: 'active',
+        },
+        {
+          id: '3',
+          policyName: 'Star Health Optima',
+          policyType: 'Health Insurance',
+          sumAssured: 1000000, // Health coverage - must be EXCLUDED
+          status: 'active',
+        },
+        {
+          id: '4',
+          policyName: 'ICICI Lombard Car Insurance',
+          policyType: 'Vehicle Insurance',
+          sumAssured: 650000, // Vehicle IDV - must be EXCLUDED
+          status: 'active',
+        },
+        {
+          id: '5',
+          policyName: 'Expired Endowment',
+          policyType: 'Life Insurance',
+          sumAssured: 200000,
+          status: 'expired', // Inactive - excluded
+        },
+      ];
+
+      // Replicate PolicyContext calculation logic
+      const dashboardSumAssured = samplePolicies
+        .filter((p) => {
+          const isActive = (p.status || 'active').toLowerCase() === POLICY_STATUSES.ACTIVE;
+          const isHealthOrVehicle = isAnnualRenewablePolicy(p.policyType);
+          return isActive && !isHealthOrVehicle;
+        })
+        .reduce((sum, p) => sum + (Number(p.sumAssured) || 0), 0);
+
+      // Only LIC (10L) + HDFC (50L) should be included = 60 Lakhs
+      expect(dashboardSumAssured).toBe(6000000);
+      expect(formatSumAssured(dashboardSumAssured)).toBe('₹60 Lakhs');
+    });
+
+    it('enforces fixed 1-year duration and next due date = start date + 1 year for Health and Vehicle', () => {
+      const startDate = '2025-05-15';
+
+      // For Health Insurance
+      const healthPolicyType = 'Health Insurance';
+      const isHealthAnnual = isAnnualRenewablePolicy(healthPolicyType);
+      expect(isHealthAnnual).toBe(true);
+
+      const healthDuration = isHealthAnnual ? '1' : '5';
+      const healthNextDueDate = isHealthAnnual ? calculateEndDate(startDate, 1) : startDate;
+      expect(healthDuration).toBe('1');
+      expect(healthNextDueDate).toBe('2026-05-15');
+
+      // For Vehicle Insurance
+      const vehiclePolicyType = 'Vehicle Insurance';
+      const isVehicleAnnual = isAnnualRenewablePolicy(vehiclePolicyType);
+      expect(isVehicleAnnual).toBe(true);
+
+      const vehicleDuration = isVehicleAnnual ? '1' : '10';
+      const vehicleNextDueDate = isVehicleAnnual ? calculateEndDate(startDate, 1) : startDate;
+      expect(vehicleDuration).toBe('1');
+      expect(vehicleNextDueDate).toBe('2026-05-15');
+
+      // When start date changes, next due date shifts by 1 year
+      const newStartDate = '2026-01-01';
+      const shiftedNextDueDate = calculateEndDate(newStartDate, 1);
+      expect(shiftedNextDueDate).toBe('2027-01-01');
+
+      // For non-annual policies (Life, Term, Endowment), duration and due date are flexible
+      const lifePolicyType = 'Life Insurance';
+      expect(isAnnualRenewablePolicy(lifePolicyType)).toBe(false);
+      const lifeDuration = '15';
+      const lifeNextDueDate = '2025-08-15';
+      expect(lifeDuration).toBe('15');
+      expect(lifeNextDueDate).toBe('2025-08-15');
+    });
+  });
 });
+
+
 

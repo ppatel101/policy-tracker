@@ -7,7 +7,7 @@ import { borderRadius, spacing } from '../theme/spacing';
 import { Badge } from './Badge';
 import { formatCurrency, formatSumAssured } from '../utils/currencyUtils';
 import { formatDisplayDate, calculateRemainingDuration } from '../utils/dateUtils';
-import { POLICY_STATUSES } from '../utils/constants';
+import { POLICY_STATUSES, getCoverageShortLabel } from '../utils/constants';
 
 export const PolicyCard = ({ policy, onPress, style }) => {
   if (!policy) return null;
@@ -67,7 +67,7 @@ export const PolicyCard = ({ policy, onPress, style }) => {
 
         {policy.sumAssured ? (
           <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Sum Assured</Text>
+            <Text style={styles.detailLabel}>{getCoverageShortLabel(policy.policyType)}</Text>
             <Text style={[styles.detailValue, styles.sumAssuredValue]}>
               {formatSumAssured(policy.sumAssured)}
             </Text>
