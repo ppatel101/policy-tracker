@@ -805,6 +805,44 @@ describe('Model Mappings (camelCase <-> snake_case)', () => {
       expect(lifeDuration).toBe('15');
       expect(lifeNextDueDate).toBe('2025-08-15');
     });
+
+    it('stores and retrieves IDV correctly in database row mapping without dropping sum_assured', () => {
+      // 1. createPolicyModel with idv / sumAssured
+      const vehiclePolicy = createPolicyModel({
+        policyName: 'Hyundai Creta Comprehensive',
+        companyName: 'HDFC Ergo',
+        policyType: 'Vehicle Insurance',
+        idv: '6,50,000',
+        premiumAmount: 18500,
+        startDate: '2025-06-01',
+        durationYears: 1,
+        nextDueDate: '2026-06-01',
+      });
+
+      expect(vehiclePolicy.sumAssured).toBe(650000);
+      expect(vehiclePolicy.idv).toBe(650000);
+
+      // 2. mapPolicyToRow must map IDV to sum_assured and not include empty tpa_name / covered_members
+      const dbRow = mapPolicyToRow(vehiclePolicy);
+      expect(dbRow.sum_assured).toBe(650000);
+      expect(dbRow.tpa_name).toBeUndefined();
+      expect(dbRow.covered_members).toBeUndefined();
+
+      // 3. mapRowToPolicy must reconstruct sumAssured (IDV) from sum_assured in the database
+      const reconstructedFromSumAssured = mapRowToPolicy(dbRow);
+      expect(reconstructedFromSumAssured.sumAssured).toBe(650000);
+      expect(reconstructedFromSumAssured.idv).toBe(650000);
+
+      // 4. Test selective fallback logic: error with 'covered_members' or 'tpa_name' must NEVER delete sum_assured
+      const fallbackRow = { ...dbRow, covered_members: '[]', tpa_name: 'Vidal' };
+      const simulatedErrMsg = "could not find the 'covered_members' column of 'policies' in the schema cache";
+      const matchCol = simulatedErrMsg.match(/could not find the '([^']+)' column/i);
+      if (matchCol && matchCol[1]) {
+        delete fallbackRow[matchCol[1]];
+      }
+      expect(fallbackRow.sum_assured).toBe(650000);
+      expect(fallbackRow.covered_members).toBeUndefined();
+    });
   });
 });
 

@@ -34,6 +34,10 @@ export const policyService = {
           if (cached) {
             if ((mapped.sumAssured === null || mapped.sumAssured === undefined) && cached.sumAssured != null) {
               mapped.sumAssured = cached.sumAssured;
+              mapped.idv = cached.sumAssured;
+            } else if ((mapped.idv === null || mapped.idv === undefined) && cached.idv != null) {
+              mapped.idv = cached.idv;
+              if (mapped.sumAssured == null) mapped.sumAssured = cached.idv;
             }
             if (!mapped.tpaName && cached.tpaName) mapped.tpaName = cached.tpaName;
             if ((!mapped.coveredMembers || mapped.coveredMembers.length === 0) && cached.coveredMembers?.length > 0) {
@@ -88,6 +92,10 @@ export const policyService = {
           if (cached) {
             if ((policy.sumAssured === null || policy.sumAssured === undefined) && cached.sumAssured != null) {
               policy.sumAssured = cached.sumAssured;
+              policy.idv = cached.sumAssured;
+            } else if ((policy.idv === null || policy.idv === undefined) && cached.idv != null) {
+              policy.idv = cached.idv;
+              if (policy.sumAssured == null) policy.sumAssured = cached.idv;
             }
             if (!policy.tpaName && cached.tpaName) policy.tpaName = cached.tpaName;
             if ((!policy.coveredMembers || policy.coveredMembers.length === 0) && cached.coveredMembers?.length > 0) {
@@ -155,12 +163,30 @@ export const policyService = {
           ? `${insertPolicyError.message || ''} ${insertPolicyError.details || ''} ${insertPolicyError.hint || ''}`.toLowerCase()
           : '';
 
-        if (insertPolicyError && (insertErrMsg.includes('sum_assured') || insertErrMsg.includes('covered_members') || insertErrMsg.includes('tpa') || insertPolicyError.code === 'PGRST204')) {
+        if (insertPolicyError && (insertPolicyError.code === 'PGRST204' || insertErrMsg.includes('column'))) {
           const fallbackRow = { ...policyRow };
-          delete fallbackRow.sum_assured;
-          delete fallbackRow.tpa_name;
-          delete fallbackRow.covered_members;
-          const retry = await supabase.from('policies').insert(fallbackRow);
+          const matchCol = insertErrMsg.match(/could not find the '([^']+)' column/i);
+          if (matchCol && matchCol[1]) {
+            delete fallbackRow[matchCol[1]];
+          } else {
+            if (insertErrMsg.includes('covered_members')) delete fallbackRow.covered_members;
+            if (insertErrMsg.includes('tpa')) delete fallbackRow.tpa_name;
+            if (insertErrMsg.includes('idv')) delete fallbackRow.idv;
+            if (insertErrMsg.includes('sum_assured')) delete fallbackRow.sum_assured;
+          }
+
+          let retry = await supabase.from('policies').insert(fallbackRow);
+          if (retry.error && retry.error.code === 'PGRST204') {
+            const secondErrMsg = `${retry.error.message || ''}`.toLowerCase();
+            const secondMatch = secondErrMsg.match(/could not find the '([^']+)' column/i);
+            if (secondMatch && secondMatch[1]) {
+              delete fallbackRow[secondMatch[1]];
+            } else {
+              delete fallbackRow.covered_members;
+              delete fallbackRow.tpa_name;
+            }
+            retry = await supabase.from('policies').insert(fallbackRow);
+          }
           insertPolicyError = retry.error;
         }
 
@@ -237,16 +263,39 @@ export const policyService = {
           ? `${error.message || ''} ${error.details || ''} ${error.hint || ''}`.toLowerCase()
           : '';
 
-        if (error && (updateErrMsg.includes('sum_assured') || updateErrMsg.includes('covered_members') || updateErrMsg.includes('tpa') || error.code === 'PGRST204')) {
+        if (error && (error.code === 'PGRST204' || updateErrMsg.includes('column'))) {
           const fallbackRow = { ...row };
-          delete fallbackRow.sum_assured;
-          delete fallbackRow.tpa_name;
-          delete fallbackRow.covered_members;
-          const retry = await supabase
+          const matchCol = updateErrMsg.match(/could not find the '([^']+)' column/i);
+          if (matchCol && matchCol[1]) {
+            delete fallbackRow[matchCol[1]];
+          } else {
+            if (updateErrMsg.includes('covered_members')) delete fallbackRow.covered_members;
+            if (updateErrMsg.includes('tpa')) delete fallbackRow.tpa_name;
+            if (updateErrMsg.includes('idv')) delete fallbackRow.idv;
+            if (updateErrMsg.includes('sum_assured')) delete fallbackRow.sum_assured;
+          }
+
+          let retry = await supabase
             .from('policies')
             .update(fallbackRow)
             .eq('id', policyId)
             .eq('user_id', userId);
+
+          if (retry.error && retry.error.code === 'PGRST204') {
+            const secondErrMsg = `${retry.error.message || ''}`.toLowerCase();
+            const secondMatch = secondErrMsg.match(/could not find the '([^']+)' column/i);
+            if (secondMatch && secondMatch[1]) {
+              delete fallbackRow[secondMatch[1]];
+            } else {
+              delete fallbackRow.covered_members;
+              delete fallbackRow.tpa_name;
+            }
+            retry = await supabase
+              .from('policies')
+              .update(fallbackRow)
+              .eq('id', policyId)
+              .eq('user_id', userId);
+          }
           error = retry.error;
         }
 

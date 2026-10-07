@@ -37,10 +37,23 @@ export const syncService = {
             const pErrMsg = pErr
               ? `${pErr.message || ''} ${pErr.details || ''} ${pErr.hint || ''}`.toLowerCase()
               : '';
-            if (pErr && (pErrMsg.includes('sum_assured') || pErr.code === 'PGRST204')) {
+            if (pErr && (pErr.code === 'PGRST204' || pErrMsg.includes('column'))) {
               const fallbackRow = { ...policyRow };
-              delete fallbackRow.sum_assured;
-              const retry = await supabase.from('policies').upsert(fallbackRow);
+              const matchCol = pErrMsg.match(/could not find the '([^']+)' column/i);
+              if (matchCol && matchCol[1]) {
+                delete fallbackRow[matchCol[1]];
+              } else {
+                if (pErrMsg.includes('covered_members')) delete fallbackRow.covered_members;
+                if (pErrMsg.includes('tpa')) delete fallbackRow.tpa_name;
+                if (pErrMsg.includes('idv')) delete fallbackRow.idv;
+                if (pErrMsg.includes('sum_assured')) delete fallbackRow.sum_assured;
+              }
+              let retry = await supabase.from('policies').upsert(fallbackRow);
+              if (retry.error && retry.error.code === 'PGRST204') {
+                delete fallbackRow.covered_members;
+                delete fallbackRow.tpa_name;
+                retry = await supabase.from('policies').upsert(fallbackRow);
+              }
               pErr = retry.error;
             }
             if (pErr) throw pErr;
@@ -70,14 +83,31 @@ export const syncService = {
             const uErrMsg = error
               ? `${error.message || ''} ${error.details || ''} ${error.hint || ''}`.toLowerCase()
               : '';
-            if (error && (uErrMsg.includes('sum_assured') || error.code === 'PGRST204')) {
+            if (error && (error.code === 'PGRST204' || uErrMsg.includes('column'))) {
               const fallbackRow = { ...row };
-              delete fallbackRow.sum_assured;
-              const retry = await supabase
+              const matchCol = uErrMsg.match(/could not find the '([^']+)' column/i);
+              if (matchCol && matchCol[1]) {
+                delete fallbackRow[matchCol[1]];
+              } else {
+                if (uErrMsg.includes('covered_members')) delete fallbackRow.covered_members;
+                if (uErrMsg.includes('tpa')) delete fallbackRow.tpa_name;
+                if (uErrMsg.includes('idv')) delete fallbackRow.idv;
+                if (uErrMsg.includes('sum_assured')) delete fallbackRow.sum_assured;
+              }
+              let retry = await supabase
                 .from('policies')
                 .update(fallbackRow)
                 .eq('id', policy.id)
                 .eq('user_id', userId);
+              if (retry.error && retry.error.code === 'PGRST204') {
+                delete fallbackRow.covered_members;
+                delete fallbackRow.tpa_name;
+                retry = await supabase
+                  .from('policies')
+                  .update(fallbackRow)
+                  .eq('id', policy.id)
+                  .eq('user_id', userId);
+              }
               error = retry.error;
             }
             if (error) throw error;

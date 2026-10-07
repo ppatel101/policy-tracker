@@ -9,6 +9,8 @@ export function createPolicyModel(data = {}) {
   let parsedSum = null;
   if (data.sumAssured !== undefined && data.sumAssured !== null && data.sumAssured !== '') {
     parsedSum = typeof data.sumAssured === 'number' ? data.sumAssured : parseCurrencyInput(data.sumAssured);
+  } else if (data.idv !== undefined && data.idv !== null && data.idv !== '') {
+    parsedSum = typeof data.idv === 'number' ? data.idv : parseCurrencyInput(data.idv);
   }
 
   let coveredMembers = [];
@@ -30,6 +32,7 @@ export function createPolicyModel(data = {}) {
     policyNumber: data.policyNumber || '',
     policyType: data.policyType || 'Life Insurance',
     sumAssured: parsedSum,
+    idv: parsedSum,
     tpaName: data.tpaName || '',
     coveredMembers: Array.isArray(coveredMembers) ? coveredMembers : [],
     premiumAmount: typeof data.premiumAmount === 'number' ? data.premiumAmount : parseCurrencyInput(data.premiumAmount),
@@ -64,6 +67,10 @@ export function mapRowToPolicy(row) {
     }
   }
 
+  const parsedSum = row.sum_assured !== undefined && row.sum_assured !== null
+    ? Number(row.sum_assured)
+    : null;
+
   return {
     id: row.id,
     userId: row.user_id,
@@ -71,7 +78,8 @@ export function mapRowToPolicy(row) {
     companyName: row.company_name,
     policyNumber: row.policy_number,
     policyType: row.policy_type || 'Life Insurance',
-    sumAssured: row.sum_assured !== undefined && row.sum_assured !== null ? Number(row.sum_assured) : null,
+    sumAssured: parsedSum,
+    idv: parsedSum,
     tpaName: row.tpa_name || '',
     coveredMembers: Array.isArray(coveredMembers) ? coveredMembers : [],
     premiumAmount: Number(row.premium_amount) || 0,
@@ -97,6 +105,8 @@ export function mapPolicyToRow(policy) {
   let parsedSum = null;
   if (policy.sumAssured !== undefined && policy.sumAssured !== null && policy.sumAssured !== '') {
     parsedSum = typeof policy.sumAssured === 'number' ? policy.sumAssured : parseCurrencyInput(policy.sumAssured);
+  } else if (policy.idv !== undefined && policy.idv !== null && policy.idv !== '') {
+    parsedSum = typeof policy.idv === 'number' ? policy.idv : parseCurrencyInput(policy.idv);
   }
 
   const row = {
@@ -105,8 +115,6 @@ export function mapPolicyToRow(policy) {
     policy_number: policy.policyNumber || null,
     policy_type: policy.policyType || 'Life Insurance',
     sum_assured: parsedSum,
-    tpa_name: policy.tpaName || null,
-    covered_members: policy.coveredMembers && policy.coveredMembers.length > 0 ? JSON.stringify(policy.coveredMembers) : null,
     premium_amount: typeof policy.premiumAmount === 'number' ? policy.premiumAmount : parseCurrencyInput(policy.premiumAmount),
     payment_frequency: policy.paymentFrequency || 'yearly',
     start_date: policy.startDate,
@@ -116,6 +124,14 @@ export function mapPolicyToRow(policy) {
     status: policy.status || 'active',
     reminder_enabled: policy.reminderEnabled !== undefined ? Boolean(policy.reminderEnabled) : true,
   };
+
+  if (policy.tpaName && policy.tpaName.trim()) {
+    row.tpa_name = policy.tpaName.trim();
+  }
+
+  if (Array.isArray(policy.coveredMembers) && policy.coveredMembers.length > 0) {
+    row.covered_members = JSON.stringify(policy.coveredMembers);
+  }
 
   if (policy.id) row.id = policy.id;
   if (policy.userId) row.user_id = policy.userId;

@@ -44,7 +44,9 @@ export const EditPolicyScreen = ({ route, navigation }) => {
   const [policyNumber, setPolicyNumber] = useState(currentPolicy?.policyNumber || '');
   const [policyType, setPolicyType] = useState(currentPolicy?.policyType || 'Life Insurance');
   const [sumAssured, setSumAssured] = useState(
-    currentPolicy?.sumAssured != null ? String(currentPolicy.sumAssured) : ''
+    currentPolicy?.sumAssured != null
+      ? String(currentPolicy.sumAssured)
+      : (currentPolicy?.idv != null ? String(currentPolicy.idv) : '')
   );
   const [tpaName, setTpaName] = useState(currentPolicy?.tpaName || '');
   const [coveredMembers, setCoveredMembers] = useState(
