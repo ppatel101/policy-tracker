@@ -35,7 +35,7 @@ const MainTabs = () => {
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 10,
           fontWeight: '600',
         },
         tabBarIcon: ({ focused, color, size }) => {

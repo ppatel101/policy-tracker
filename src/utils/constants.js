@@ -108,6 +108,18 @@ export const isAnnualRenewablePolicy = (policyType) => {
 };
 
 /**
+ * Checks whether a policy has multi-year policy term and paying term
+ * (visible for Life Insurance and Term Insurance; hidden for Health and Vehicle).
+ * @param {string} policyType
+ * @returns {boolean}
+ */
+export const hasPolicyTerms = (policyType) => {
+  if (!policyType) return false;
+  const lower = String(policyType).toLowerCase();
+  return (lower.includes('life') || lower.includes('term')) && !isAnnualRenewablePolicy(policyType);
+};
+
+/**
  * Returns the contextual label for the coverage amount (Sum Assured / Health Coverage / Vehicle IDV)
  * @param {string} policyType
  * @returns {string}

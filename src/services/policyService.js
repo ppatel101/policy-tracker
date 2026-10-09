@@ -2,7 +2,7 @@ import { supabase, formatSupabaseError, isSupabaseConfigured } from './supabase'
 import { localStorage } from '../storage/localStorage';
 import { mapRowToPolicy, mapPolicyToRow, createPolicyModel } from '../models/policy';
 import { mapPaymentToRow, mapRowToPayment } from '../models/payment';
-import { calculateEndDate, generatePaymentSchedule } from '../utils/dateUtils';
+import { calculateEndDate, generatePaymentSchedule, calculateNextDueDateFromPayments } from '../utils/dateUtils';
 import { generateUUID } from '../utils/uuid';
 import { POLICY_STATUSES, PAYMENT_STATUSES } from '../utils/constants';
 
@@ -125,21 +125,24 @@ export const policyService = {
    */
   async createPolicy(policyInput, userId) {
     const policyId = policyInput.id || generateUUID();
-    const durationYears = parseInt(policyInput.durationYears, 10) || 1;
-    const calculatedEndDate = policyInput.endDate || calculateEndDate(policyInput.startDate, durationYears);
+    const ppt = parseInt(policyInput.premiumPayingTerm || policyInput.durationYears, 10) || 1;
+    const policyTermYears = parseInt(policyInput.policyTermYears || policyInput.policyTerm, 10) || ppt;
+    const calculatedEndDate = policyInput.endDate || calculateEndDate(policyInput.startDate, policyTermYears);
 
     const policy = createPolicyModel({
       ...policyInput,
       id: policyId,
       userId,
       endDate: calculatedEndDate,
-      durationYears,
+      durationYears: ppt,
+      premiumPayingTerm: ppt,
+      policyTermYears,
       status: policyInput.status || POLICY_STATUSES.ACTIVE,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
 
-    // Generate schedule of installments
+    // Generate schedule of installments (previous premiums auto-marked as paid up to today)
     const schedule = generatePaymentSchedule(policy).map((p) => ({
       ...p,
       id: generateUUID(),
@@ -148,6 +151,13 @@ export const policyService = {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }));
+
+    // If historical installments are already marked as paid, update policy's nextDueDate
+    // to the earliest upcoming unpaid installment
+    const nextUnpaidDueDate = calculateNextDueDateFromPayments(schedule);
+    if (nextUnpaidDueDate) {
+      policy.nextDueDate = nextUnpaidDueDate;
+    }
 
     let savedRemotely = false;
     let remoteError = null;
@@ -169,6 +179,7 @@ export const policyService = {
           if (matchCol && matchCol[1]) {
             delete fallbackRow[matchCol[1]];
           } else {
+            if (insertErrMsg.includes('policy_term')) delete fallbackRow.policy_term_years;
             if (insertErrMsg.includes('covered_members')) delete fallbackRow.covered_members;
             if (insertErrMsg.includes('tpa')) delete fallbackRow.tpa_name;
             if (insertErrMsg.includes('idv')) delete fallbackRow.idv;
@@ -182,6 +193,7 @@ export const policyService = {
             if (secondMatch && secondMatch[1]) {
               delete fallbackRow[secondMatch[1]];
             } else {
+              delete fallbackRow.policy_term_years;
               delete fallbackRow.covered_members;
               delete fallbackRow.tpa_name;
             }
@@ -269,6 +281,7 @@ export const policyService = {
           if (matchCol && matchCol[1]) {
             delete fallbackRow[matchCol[1]];
           } else {
+            if (updateErrMsg.includes('policy_term')) delete fallbackRow.policy_term_years;
             if (updateErrMsg.includes('covered_members')) delete fallbackRow.covered_members;
             if (updateErrMsg.includes('tpa')) delete fallbackRow.tpa_name;
             if (updateErrMsg.includes('idv')) delete fallbackRow.idv;
@@ -287,6 +300,7 @@ export const policyService = {
             if (secondMatch && secondMatch[1]) {
               delete fallbackRow[secondMatch[1]];
             } else {
+              delete fallbackRow.policy_term_years;
               delete fallbackRow.covered_members;
               delete fallbackRow.tpa_name;
             }

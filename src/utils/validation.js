@@ -14,9 +14,12 @@ export function validatePolicyForm(values) {
     errors.companyName = 'Company name is required';
   }
 
+  const premiumDigits = String(values.premiumAmount ?? '').replace(/[^0-9]/g, '');
   const premium = parseFloat(values.premiumAmount);
   if (isNaN(premium) || premium <= 0) {
     errors.premiumAmount = 'Premium amount must be greater than 0';
+  } else if (premiumDigits.length > 8 || premium > 99999999) {
+    errors.premiumAmount = 'Premium amount cannot exceed 8 digits';
   }
 
   if (!values.startDate || !values.startDate.trim()) {
@@ -28,11 +31,24 @@ export function validatePolicyForm(values) {
     }
   }
 
-  const duration = parseInt(values.durationYears, 10);
-  if (isNaN(duration) || duration <= 0) {
-    errors.durationYears = 'Duration must be at least 1 year';
-  } else if (duration > 100) {
-    errors.durationYears = 'Duration cannot exceed 100 years';
+  const ppt = parseInt(values.premiumPayingTerm !== undefined ? values.premiumPayingTerm : values.durationYears, 10);
+  if (isNaN(ppt) || ppt <= 0) {
+    errors.premiumPayingTerm = 'Premium paying term must be at least 1 year';
+    errors.durationYears = errors.premiumPayingTerm;
+  } else if (ppt > 99) {
+    errors.premiumPayingTerm = 'Premium paying term cannot exceed 99 years';
+    errors.durationYears = errors.premiumPayingTerm;
+  }
+
+  if (values.policyTermYears !== undefined && values.policyTermYears !== null && values.policyTermYears !== '') {
+    const pt = parseInt(values.policyTermYears, 10);
+    if (isNaN(pt) || pt <= 0) {
+      errors.policyTermYears = 'Policy term must be at least 1 year';
+    } else if (pt > 99) {
+      errors.policyTermYears = 'Policy term cannot exceed 99 years';
+    } else if (!isNaN(ppt) && pt < ppt) {
+      errors.policyTermYears = 'Policy term cannot be less than premium paying term';
+    }
   }
 
   if (!values.nextDueDate || !values.nextDueDate.trim()) {
@@ -45,12 +61,15 @@ export function validatePolicyForm(values) {
   }
 
   if (values.sumAssured !== undefined && values.sumAssured !== null && values.sumAssured !== '') {
+    const sumAssuredDigits = String(values.sumAssured).replace(/[^0-9]/g, '');
     const sumAssuredNum =
       typeof values.sumAssured === 'number'
         ? values.sumAssured
         : parseFloat(String(values.sumAssured).replace(/,/g, ''));
     if (isNaN(sumAssuredNum) || sumAssuredNum < 0) {
       errors.sumAssured = 'Sum assured must be a valid positive amount';
+    } else if (sumAssuredDigits.length > 8 || sumAssuredNum > 99999999) {
+      errors.sumAssured = 'Sum assured cannot exceed 8 digits';
     }
   }
 

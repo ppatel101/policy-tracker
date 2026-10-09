@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   chipText: {
     ...typography.captionBold,
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 10,
   },
   chipTextActive: {
     color: colors.textInverse,
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
   fyInfoText: {
     ...typography.captionBold,
     color: colors.primaryDark,
-    fontSize: 12,
+    fontSize: 10,
   },
   fyToggleBtn: {
     paddingHorizontal: spacing.sm,
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
   fyToggleBtnText: {
     ...typography.captionBold,
     color: colors.primary,
-    fontSize: 11,
+    fontSize: 10,
   },
   listContent: {
     padding: spacing.lg,

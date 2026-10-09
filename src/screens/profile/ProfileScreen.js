@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   joinedText: {
     ...typography.caption,
     color: colors.textSecondary,
-    fontSize: 11,
+    fontSize: 10,
   },
   infoBanner: {
     flexDirection: 'row',

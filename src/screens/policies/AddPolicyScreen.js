@@ -17,7 +17,7 @@ import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { DatePickerInput } from '../../components/DatePickerInput';
 import { validatePolicyForm } from '../../utils/validation';
-import { calculateEndDate, formatDate } from '../../utils/dateUtils';
+import { calculateEndDate, calculateNextDueDate, formatDate, startOfDay } from '../../utils/dateUtils';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing, borderRadius } from '../../theme/spacing';
@@ -27,6 +27,7 @@ import {
   isHealthPolicy,
   isVehiclePolicy,
   isAnnualRenewablePolicy,
+  hasPolicyTerms,
   getCoverageLabel,
   FAMILY_RELATIONS,
 } from '../../utils/constants';
@@ -49,8 +50,9 @@ export const AddPolicyScreen = ({ navigation, route }) => {
   const [premiumAmount, setPremiumAmount] = useState('');
   const [paymentFrequency, setPaymentFrequency] = useState('yearly');
   const [startDate, setStartDate] = useState(todayStr);
-  const [durationYears, setDurationYears] = useState(isInitialAnnual ? '1' : '5');
-  const [nextDueDate, setNextDueDate] = useState(isInitialAnnual ? calculateEndDate(todayStr, 1) : todayStr);
+  const [premiumPayingTerm, setPremiumPayingTerm] = useState(isInitialAnnual ? '1' : '5');
+  const [policyTermYears, setPolicyTermYears] = useState(isInitialAnnual ? '1' : '10');
+  const [nextDueDate, setNextDueDate] = useState(calculateNextDueDate(todayStr, 'yearly'));
   const [reminderEnabled, setReminderEnabled] = useState(true);
 
   // State for inline add member
@@ -65,19 +67,31 @@ export const AddPolicyScreen = ({ navigation, route }) => {
   const [serverError, setServerError] = useState('');
 
   const isAnnual = isAnnualRenewablePolicy(policyType);
-  const effectiveDuration = isAnnual ? '1' : durationYears;
-  const effectiveNextDueDate = isAnnual ? calculateEndDate(startDate, 1) : nextDueDate;
+  const showTerms = hasPolicyTerms(policyType);
+  const effectivePpt = showTerms ? premiumPayingTerm : '1';
+  const effectivePolicyTerm = showTerms ? policyTermYears : '1';
+  const effectiveDuration = effectivePpt;
+  const effectiveNextDueDate = calculateNextDueDate(startDate, isAnnual ? 'yearly' : paymentFrequency);
 
-  // Auto-calculated end date
-  const calculatedEndDate = calculateEndDate(startDate, effectiveDuration);
+  // Auto-calculated end date (based on Policy Term)
+  const calculatedEndDate = calculateEndDate(startDate, effectivePolicyTerm);
+  const isPastStartDate = startDate && startOfDay(startDate).getTime() < startOfDay(new Date()).getTime();
 
-  // When start date changes, optionally update next due date if default or annual
+  // When start date changes, update next due date based on payment frequency
   const handleStartDateChange = (date) => {
     setStartDate(date);
     if (isAnnualRenewablePolicy(policyType)) {
-      setNextDueDate(calculateEndDate(date, 1));
-    } else if (!nextDueDate || nextDueDate === startDate) {
-      setNextDueDate(date);
+      setNextDueDate(calculateNextDueDate(date, 'yearly'));
+    } else {
+      setNextDueDate(calculateNextDueDate(date, paymentFrequency));
+    }
+    if (errors.startDate) setErrors((prev) => ({ ...prev, startDate: null }));
+  };
+
+  const handleFrequencyChange = (freq) => {
+    setPaymentFrequency(freq);
+    if (!isAnnualRenewablePolicy(policyType)) {
+      setNextDueDate(calculateNextDueDate(startDate, freq));
     }
   };
 
@@ -85,9 +99,13 @@ export const AddPolicyScreen = ({ navigation, route }) => {
     setPolicyType(type);
     if (isAnnualRenewablePolicy(type)) {
       // Fixed at 1 year for Health and Vehicle Insurance (Annual Renewal)
-      setDurationYears('1');
+      setPremiumPayingTerm('1');
+      setPolicyTermYears('1');
       setPaymentFrequency('yearly');
-      setNextDueDate(calculateEndDate(startDate, 1));
+      setNextDueDate(calculateNextDueDate(startDate, 'yearly'));
+    } else {
+      if (premiumPayingTerm === '1') setPremiumPayingTerm('5');
+      if (policyTermYears === '1') setPolicyTermYears('10');
     }
   };
 
@@ -126,7 +144,9 @@ export const AddPolicyScreen = ({ navigation, route }) => {
       premiumAmount,
       paymentFrequency: isAnnual ? 'yearly' : paymentFrequency,
       startDate,
-      durationYears: effectiveDuration,
+      durationYears: effectivePpt,
+      premiumPayingTerm: effectivePpt,
+      policyTermYears: effectivePolicyTerm,
       nextDueDate: effectiveNextDueDate,
       reminderEnabled,
     };
@@ -261,14 +281,16 @@ export const AddPolicyScreen = ({ navigation, route }) => {
           <Text style={styles.sectionHeader}>Coverage & Premium</Text>
 
           <Input
-            label={`${getCoverageLabel(policyType)} (₹) (Optional)`}
+            label={`${getCoverageLabel(policyType)}`}
             placeholder={isVehiclePolicy(policyType) ? "e.g. 6,50,000" : "e.g. 10,00,000"}
             value={sumAssured}
             onChangeText={(t) => {
-              setSumAssured(t);
+              const cleaned = t.replace(/[^0-9]/g, '').slice(0, 8);
+              setSumAssured(cleaned);
               if (errors.sumAssured) setErrors((prev) => ({ ...prev, sumAssured: null }));
             }}
             keyboardType="numeric"
+            maxLength={8}
             leftIcon={<Ionicons name={isVehiclePolicy(policyType) ? "car-outline" : "shield-outline"} size={18} color={colors.textSecondary} />}
             error={errors.sumAssured}
           />
@@ -410,10 +432,12 @@ export const AddPolicyScreen = ({ navigation, route }) => {
             placeholder="e.g. 25000"
             value={premiumAmount}
             onChangeText={(t) => {
-              setPremiumAmount(t);
+              const cleaned = t.replace(/[^0-9]/g, '').slice(0, 8);
+              setPremiumAmount(cleaned);
               if (errors.premiumAmount) setErrors((prev) => ({ ...prev, premiumAmount: null }));
             }}
             keyboardType="numeric"
+            maxLength={8}
             leftIcon={<Text style={styles.currencyPrefix}>₹</Text>}
             error={errors.premiumAmount}
             required
@@ -429,7 +453,7 @@ export const AddPolicyScreen = ({ navigation, route }) => {
                   <TouchableOpacity
                     key={freq.value}
                     activeOpacity={0.7}
-                    onPress={() => setPaymentFrequency(freq.value)}
+                    onPress={() => handleFrequencyChange(freq.value)}
                     style={[styles.freqChip, isSelected && styles.freqChipActive]}
                   >
                     <Text style={[styles.freqChipText, isSelected && styles.freqChipTextActive]}>
@@ -441,60 +465,123 @@ export const AddPolicyScreen = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* Section: Dates & Duration */}
-          <Text style={styles.sectionHeader}>Dates & Policy Term</Text>
+          {/* Section: Dates & Policy Term */}
+          <Text style={styles.sectionHeader}>
+            {showTerms ? 'Dates & Policy Term' : 'Policy Dates'}
+          </Text>
 
-          <View style={styles.rowInputs}>
-            <View style={styles.halfInput}>
-              <DatePickerInput
-                label="Start Date"
-                value={startDate}
-                onChange={handleStartDateChange}
-                error={errors.startDate}
-                required
-              />
-            </View>
+          {showTerms ? (
+            <>
+              <View style={styles.rowInputs}>
+                <View style={styles.halfInput}>
+                  <DatePickerInput
+                    label="Start Date"
+                    value={startDate}
+                    onChange={handleStartDateChange}
+                    error={errors.startDate}
+                    helperText={isPastStartDate ? 'Premiums before today will be marked as paid' : undefined}
+                    required
+                  />
+                </View>
 
-            <View style={styles.halfInput}>
-              <Input
-                label="Duration (Years)"
-                placeholder="e.g. 5"
-                value={effectiveDuration}
-                onChangeText={(t) => {
-                  setDurationYears(t);
-                  if (errors.durationYears) setErrors((prev) => ({ ...prev, durationYears: null }));
-                }}
-                keyboardType="numeric"
-                editable={!isAnnual}
-                helperText={isAnnual ? 'Fixed at 1 Year for annual renewable policy' : undefined}
-                error={errors.durationYears}
-                required
-              />
+                <View style={styles.halfInput}>
+                  <Input
+                    label="Premium Paying Term"
+                    placeholder="e.g. 5"
+                    value={effectivePpt}
+                    onChangeText={(t) => {
+                      const cleaned = t.replace(/[^0-9]/g, '').slice(0, 2);
+                      setPremiumPayingTerm(cleaned);
+                      if (errors.premiumPayingTerm || errors.durationYears) {
+                        setErrors((prev) => ({ ...prev, premiumPayingTerm: null, durationYears: null }));
+                      }
+                      const num = parseInt(cleaned, 10);
+                      const ptNum = parseInt(policyTermYears, 10);
+                      if (!isNaN(num) && (!ptNum || ptNum < num)) {
+                        setPolicyTermYears(cleaned);
+                      }
+                    }}
+                    keyboardType="numeric"
+                    maxLength={2}
+                    error={errors.premiumPayingTerm || errors.durationYears}
+                    required
+                  />
+                </View>
+              </View>
+
+              <View style={styles.rowInputs}>
+                <View style={styles.halfInput}>
+                  <Input
+                    label="Policy Term"
+                    placeholder="e.g. 10"
+                    value={effectivePolicyTerm}
+                    onChangeText={(t) => {
+                      const cleaned = t.replace(/[^0-9]/g, '').slice(0, 2);
+                      setPolicyTermYears(cleaned);
+                      if (errors.policyTermYears) {
+                        setErrors((prev) => ({ ...prev, policyTermYears: null }));
+                      }
+                    }}
+                    keyboardType="numeric"
+                    maxLength={2}
+                    error={errors.policyTermYears}
+                    required
+                  />
+                </View>
+
+                <View style={styles.halfInput}>
+                  <DatePickerInput
+                    label="End Date"
+                    value={calculatedEndDate}
+                    disabled={true}
+                    required
+                  />
+                </View>
+              </View>
+            </>
+          ) : (
+            /* For Health & Vehicle: PPT and Policy Term are hidden */
+            <View style={styles.rowInputs}>
+              <View style={styles.halfInput}>
+                <DatePickerInput
+                  label="Start Date"
+                  value={startDate}
+                  onChange={handleStartDateChange}
+                  error={errors.startDate}
+                  helperText={isPastStartDate ? 'Premiums before today will be marked as paid' : undefined}
+                  required
+                />
+              </View>
+
+              <View style={styles.halfInput}>
+                <DatePickerInput
+                  label="End Date"
+                  value={calculatedEndDate}
+                  disabled={true}
+                  required
+                />
+              </View>
             </View>
-          </View>
+          )}
 
           <View style={styles.rowInputs}>
             <View style={styles.halfInput}>
               <DatePickerInput
                 label="Next Due Date"
                 value={effectiveNextDueDate}
-                onChange={(date) => {
-                  setNextDueDate(date);
-                  if (errors.nextDueDate) setErrors((prev) => ({ ...prev, nextDueDate: null }));
-                }}
-                disabled={isAnnual}
-                helperText={isAnnual ? 'Fixed at 1 year after start date (Annual Renewal)' : undefined}
+                onChange={setNextDueDate}
+                disabled={true}
+                helperText={
+                  isAnnual
+                    ? 'Fixed at 1 year after start date (Annual Renewal)'
+                    : 'Auto-calculated from start date & payment frequency'
+                }
                 error={errors.nextDueDate}
                 required
               />
             </View>
 
-            <View style={styles.halfInput}>
-              <View style={styles.computedBox}>
-                <Text style={styles.computedLabel}>End Date (Calculated)</Text>
-                <Text style={styles.computedValue}>{calculatedEndDate || 'N/A'}</Text>
-              </View>
-            </View>
+            <View style={styles.halfInput} />
           </View>
 
           {/* Reminder Toggle */}
@@ -598,7 +685,7 @@ const styles = StyleSheet.create({
   currencyPrefix: {
     ...typography.bodyBold,
     color: colors.primary,
-    fontSize: 16,
+    fontSize: 14,
   },
   frequencyRow: {
     flexDirection: 'row',
@@ -620,7 +707,7 @@ const styles = StyleSheet.create({
   freqChipText: {
     ...typography.captionBold,
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 10,
   },
   freqChipTextActive: {
     color: colors.primaryDark,
@@ -631,25 +718,6 @@ const styles = StyleSheet.create({
   },
   halfInput: {
     flex: 1,
-  },
-  computedBox: {
-    height: 48,
-    backgroundColor: colors.surfaceVariant,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    justifyContent: 'center',
-    marginTop: 22,
-  },
-  computedLabel: {
-    fontSize: 10,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-  },
-  computedValue: {
-    ...typography.bodyBold,
-    color: colors.textPrimary,
   },
   reminderRow: {
     flexDirection: 'row',
@@ -694,13 +762,13 @@ const styles = StyleSheet.create({
   healthBannerTitle: {
     ...typography.captionBold,
     color: colors.primaryDark,
-    fontSize: 13,
+    fontSize: 11,
   },
   healthBannerDesc: {
     ...typography.caption,
     color: colors.primaryDark,
     marginTop: 2,
-    fontSize: 11,
+    fontSize: 10,
   },
   healthSectionContainer: {
     marginBottom: spacing.lg,
@@ -723,7 +791,7 @@ const styles = StyleSheet.create({
   addMemberBtnText: {
     ...typography.captionBold,
     color: colors.primaryDark,
-    fontSize: 12,
+    fontSize: 10,
   },
   emptyMembersBox: {
     backgroundColor: colors.surfaceVariant,
@@ -818,7 +886,7 @@ const styles = StyleSheet.create({
   relationChipText: {
     ...typography.captionBold,
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 10,
   },
   relationChipTextActive: {
     color: colors.textInverse,

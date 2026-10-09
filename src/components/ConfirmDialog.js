@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   dialogButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
 });

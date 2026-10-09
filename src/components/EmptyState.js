@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   actionButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
 });

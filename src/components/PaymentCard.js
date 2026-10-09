@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
   markPaidBtnText: {
     ...typography.captionBold,
     color: '#065F46', // Dark emerald
-    fontSize: 13,
+    fontSize: 11,
   },
   paidConfirmedRow: {
     flexDirection: 'row',
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   futureBadgeText: {
     ...typography.caption,
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '500',
   },
 });

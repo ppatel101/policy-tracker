@@ -183,13 +183,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   textSmall: {
-    fontSize: 13,
+    fontSize: 11,
   },
   textMedium: {
-    fontSize: 15,
+    fontSize: 13,
   },
   textLarge: {
-    fontSize: 17,
+    fontSize: 15,
   },
   textPrimary: {
     color: colors.textInverse,

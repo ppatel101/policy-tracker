@@ -130,14 +130,14 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   headerTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: 'rgba(224, 231, 255, 0.85)',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   headerSubtitle: {
-    fontSize: 11.5,
+    fontSize: 10.5,
     color: 'rgba(255, 255, 255, 0.65)',
     marginTop: 2,
   },
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   badgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#F8FAFC',
   },
@@ -162,18 +162,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   statSymbol: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     color: '#FFFFFF',
   },
   statValue: {
-    fontSize: 35,
+    fontSize: 32,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.5,
   },
   statUnit: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '600',
     color: '#C7D2FE', // Pastel lavender blue
   },
@@ -192,12 +192,12 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   progressTitle: {
-    fontSize: 12.5,
+    fontSize: 11,
     fontWeight: '500',
     color: '#CBD5E1',
   },
   progressPercent: {
-    fontSize: 12.5,
+    fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#A5B4FC',
   },
   breakdownText: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.85)',
   },
   breakdownBold: {

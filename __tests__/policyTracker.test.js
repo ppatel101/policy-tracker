@@ -12,6 +12,7 @@ import {
   formatDate,
   formatDisplayDate,
   calculateEndDate,
+  calculateNextDueDate,
   calculateRemainingDuration,
   isOverdue,
   isDueToday,
@@ -41,6 +42,7 @@ import {
   isHealthPolicy,
   isVehiclePolicy,
   isAnnualRenewablePolicy,
+  hasPolicyTerms,
   getCoverageLabel,
   getCoverageShortLabel,
   FAMILY_RELATIONS,
@@ -111,9 +113,23 @@ describe('Date Utilities & Calculations', () => {
     expect(formatDisplayDate('2026-10-01')).toBe('01 Oct 2026');
   });
 
-  it('calculates policy end date based on duration in years', () => {
+  it('calculates policy end date based on policy term in years', () => {
+    // 5 years policy term from 2026-10-01 ends on 2031-10-01
     expect(calculateEndDate('2026-10-01', 5)).toBe('2031-10-01');
     expect(calculateEndDate('2026-01-15', 1)).toBe('2027-01-15');
+    // Policy term 10 years from 2020-10-08 -> end date 2030-10-08
+    expect(calculateEndDate('2020-10-08', 10)).toBe('2030-10-08');
+    // Policy term 5 years from 2020-10-08 -> end date 2025-10-08
+    expect(calculateEndDate('2020-10-08', 5)).toBe('2025-10-08');
+  });
+
+  it('calculates next due date based on payment frequency', () => {
+    // Specific user scenario: Start date 2020-10-08, yearly -> next due date 2021-10-08
+    expect(calculateNextDueDate('2020-10-08', 'yearly')).toBe('2021-10-08');
+    expect(calculateNextDueDate('2020-10-08', 'half-yearly')).toBe('2021-04-08');
+    expect(calculateNextDueDate('2020-10-08', 'quarterly')).toBe('2021-01-08');
+    expect(calculateNextDueDate('2020-10-08', 'monthly')).toBe('2020-11-08');
+    expect(calculateNextDueDate('2025-05-15', 'yearly')).toBe('2026-05-15');
   });
 
   it('calculates dynamic remaining duration accurately', () => {
@@ -158,6 +174,8 @@ describe('Date Utilities & Calculations', () => {
       startDate: '2026-10-01',
       endDate: '2031-10-01',
       durationYears: 5,
+      premiumPayingTerm: 5,
+      policyTermYears: 5,
       paymentFrequency: 'yearly',
       premiumAmount: 20000,
     };
@@ -168,10 +186,26 @@ describe('Date Utilities & Calculations', () => {
     expect(yearlySchedule[1].dueDate).toBe('2027-10-01');
     expect(yearlySchedule[4].dueDate).toBe('2030-10-01');
 
+    // Limited pay policy: PPT = 5 years, Policy Term = 10 years
+    const limitedPayPolicy = {
+      startDate: '2026-10-01',
+      endDate: '2036-10-01',
+      premiumPayingTerm: 5,
+      policyTermYears: 10,
+      paymentFrequency: 'yearly',
+      premiumAmount: 25000,
+    };
+
+    const limitedSchedule = generatePaymentSchedule(limitedPayPolicy);
+    expect(limitedSchedule.length).toBe(5);
+    expect(limitedSchedule[0].dueDate).toBe('2026-10-01');
+    expect(limitedSchedule[4].dueDate).toBe('2030-10-01');
+
     // Quarterly Policy: 2 years = 8 installments
     const quarterlyPolicy = {
       startDate: '2026-01-01',
       durationYears: 2,
+      premiumPayingTerm: 2,
       paymentFrequency: 'quarterly',
       premiumAmount: 5000,
     };
@@ -180,6 +214,67 @@ describe('Date Utilities & Calculations', () => {
     expect(quarterlySchedule.length).toBe(8);
     expect(quarterlySchedule[0].dueDate).toBe('2026-01-01');
     expect(quarterlySchedule[1].dueDate).toBe('2026-04-01');
+  });
+
+  it('marks all previous premiums as paid until today date for historical policies', () => {
+    const refDate = new Date('2026-10-09');
+
+    // 5-year PPT and 5-year Policy Term commencing in 2020 (completed in 2025)
+    const policy2020 = {
+      startDate: '2020-10-08',
+      endDate: '2025-10-08',
+      durationYears: 5,
+      premiumPayingTerm: 5,
+      policyTermYears: 5,
+      paymentFrequency: 'yearly',
+      premiumAmount: 25000,
+    };
+
+    const completedSchedule = generatePaymentSchedule(policy2020, refDate);
+    expect(completedSchedule.length).toBe(5);
+
+    // All installments (2020, 2021, 2022, 2023, 2024) are prior to 2026-10-09
+    completedSchedule.forEach((pmt, idx) => {
+      expect(pmt.status).toBe(PAYMENT_STATUSES.PAID);
+      expect(pmt.paidDate).toBe(pmt.dueDate);
+      expect(pmt.paidAmount).toBe(25000);
+      expect(pmt.amount).toBe(25000);
+    });
+
+    // 10-year policy commencing in 2020 (active until 2030)
+    const policy10Years = {
+      startDate: '2020-10-08',
+      endDate: '2030-10-08',
+      durationYears: 10,
+      premiumPayingTerm: 10,
+      policyTermYears: 10,
+      paymentFrequency: 'yearly',
+      premiumAmount: 30000,
+    };
+
+    const activeSchedule = generatePaymentSchedule(policy10Years, refDate);
+    expect(activeSchedule.length).toBe(10);
+
+    // Installments up to 2026-10-08 are in the past -> auto-marked as PAID
+    for (let i = 0; i <= 6; i++) {
+      expect(activeSchedule[i].status).toBe(PAYMENT_STATUSES.PAID);
+      expect(activeSchedule[i].paidDate).toBe(activeSchedule[i].dueDate);
+      expect(activeSchedule[i].paidAmount).toBe(30000);
+    }
+    expect(activeSchedule[0].dueDate).toBe('2020-10-08');
+    expect(activeSchedule[6].dueDate).toBe('2026-10-08');
+
+    // Installments in future (2027, 2028, 2029) -> UPCOMING
+    for (let i = 7; i <= 9; i++) {
+      expect(activeSchedule[i].status).toBe(PAYMENT_STATUSES.UPCOMING);
+      expect(activeSchedule[i].paidDate).toBeNull();
+      expect(activeSchedule[i].paidAmount).toBeNull();
+    }
+    expect(activeSchedule[7].dueDate).toBe('2027-10-08');
+
+    // Next due date resolves to first unpaid upcoming payment
+    const nextUnpaid = calculateNextDueDateFromPayments(activeSchedule);
+    expect(nextUnpaid).toBe('2027-10-08');
   });
 
   it('calculates next due date as earliest unpaid payment', () => {
@@ -348,6 +443,127 @@ describe('Form Validations', () => {
     expect(invalidResult.isValid).toBe(false);
     expect(invalidResult.errors.sumAssured).toBeDefined();
   });
+
+  it('validates premium amount and sum assured maximum 8 digits', () => {
+    const baseValid = {
+      policyName: 'HDFC Life Sanchay',
+      companyName: 'HDFC Life',
+      premiumAmount: 50000,
+      startDate: '2026-10-01',
+      durationYears: 10,
+      nextDueDate: '2026-10-01',
+      sumAssured: '50,00,000',
+    };
+
+    // 8 digits boundary: 99,999,999 (valid)
+    const valid8Digits = validatePolicyForm({
+      ...baseValid,
+      premiumAmount: 99999999,
+      sumAssured: 99999999,
+    });
+    expect(valid8Digits.isValid).toBe(true);
+
+    // 8 digits with commas: 1,00,00,000 (valid)
+    const validCommas8Digits = validatePolicyForm({
+      ...baseValid,
+      sumAssured: '1,00,00,000',
+    });
+    expect(validCommas8Digits.isValid).toBe(true);
+
+    // 9 digits premium: 100,000,000 (invalid)
+    const invalidPremium9Digits = validatePolicyForm({
+      ...baseValid,
+      premiumAmount: 100000000,
+    });
+    expect(invalidPremium9Digits.isValid).toBe(false);
+    expect(invalidPremium9Digits.errors.premiumAmount).toBe('Premium amount cannot exceed 8 digits');
+
+    // 9 digits sum assured: 100,000,000 (invalid)
+    const invalidSum9Digits = validatePolicyForm({
+      ...baseValid,
+      sumAssured: 100000000,
+    });
+    expect(invalidSum9Digits.isValid).toBe(false);
+    expect(invalidSum9Digits.errors.sumAssured).toBe('Sum assured cannot exceed 8 digits');
+
+    // 9 digits formatted sum assured: 10,00,00,000 (invalid)
+    const invalidFormattedSum = validatePolicyForm({
+      ...baseValid,
+      sumAssured: '10,00,00,000',
+    });
+    expect(invalidFormattedSum.isValid).toBe(false);
+    expect(invalidFormattedSum.errors.sumAssured).toBe('Sum assured cannot exceed 8 digits');
+  });
+
+  it('validates premium paying term and policy term years correctly', () => {
+    const baseForm = {
+      policyName: 'HDFC Life Click 2 Protect',
+      companyName: 'HDFC Life',
+      premiumAmount: 25000,
+      startDate: '2026-10-01',
+      nextDueDate: '2026-10-01',
+    };
+
+    // Valid: PPT = 5, Policy Term = 10
+    const validTerms = validatePolicyForm({
+      ...baseForm,
+      premiumPayingTerm: 5,
+      policyTermYears: 10,
+    });
+    expect(validTerms.isValid).toBe(true);
+
+    // Invalid: Policy Term < Premium Paying Term (e.g. PT = 5, PPT = 10)
+    const invalidTerms = validatePolicyForm({
+      ...baseForm,
+      premiumPayingTerm: 10,
+      policyTermYears: 5,
+    });
+    expect(invalidTerms.isValid).toBe(false);
+    expect(invalidTerms.errors.policyTermYears).toBe('Policy term cannot be less than premium paying term');
+
+    // Invalid: PPT = 0 or negative
+    const invalidPpt = validatePolicyForm({
+      ...baseForm,
+      premiumPayingTerm: 0,
+      policyTermYears: 10,
+    });
+    expect(invalidPpt.isValid).toBe(false);
+    expect(invalidPpt.errors.premiumPayingTerm).toBe('Premium paying term must be at least 1 year');
+
+    // Invalid: PPT > 99 years
+    const invalidPptExceed = validatePolicyForm({
+      ...baseForm,
+      premiumPayingTerm: 100,
+      policyTermYears: 100,
+    });
+    expect(invalidPptExceed.isValid).toBe(false);
+    expect(invalidPptExceed.errors.premiumPayingTerm).toBe('Premium paying term cannot exceed 99 years');
+
+    // Invalid: Policy Term > 99 years
+    const invalidPtExceed = validatePolicyForm({
+      ...baseForm,
+      premiumPayingTerm: 50,
+      policyTermYears: 100,
+    });
+    expect(invalidPtExceed.isValid).toBe(false);
+    expect(invalidPtExceed.errors.policyTermYears).toBe('Policy term cannot exceed 99 years');
+
+    // Valid: Boundary 99 years
+    const validMaxBoundary = validatePolicyForm({
+      ...baseForm,
+      premiumPayingTerm: 99,
+      policyTermYears: 99,
+    });
+    expect(validMaxBoundary.isValid).toBe(true);
+
+    // Valid: Boundary 1 year
+    const validMinBoundary = validatePolicyForm({
+      ...baseForm,
+      premiumPayingTerm: 1,
+      policyTermYears: 1,
+    });
+    expect(validMinBoundary.isValid).toBe(true);
+  });
 });
 
 describe('Model Mappings (camelCase <-> snake_case)', () => {
@@ -424,6 +640,44 @@ describe('Model Mappings (camelCase <-> snake_case)', () => {
     expect(row.sum_assured).toBe(1000000);
     const remapped = mapRowToPolicy(row);
     expect(remapped.sumAssured).toBe(1000000);
+  });
+
+  it('correctly maps premiumPayingTerm and policyTermYears bidirectionally', () => {
+    // Model creation
+    const model = createPolicyModel({
+      policyName: 'Tata AIA Param Rakshak',
+      companyName: 'Tata AIA',
+      premiumPayingTerm: 7,
+      policyTermYears: 15,
+      premiumAmount: 50000,
+    });
+
+    expect(model.premiumPayingTerm).toBe(7);
+    expect(model.policyTermYears).toBe(15);
+    expect(model.durationYears).toBe(7);
+
+    // Model -> DB Row
+    const row = mapPolicyToRow(model);
+    expect(row.duration_years).toBe(7);
+    expect(row.policy_term_years).toBe(15);
+
+    // DB Row -> Model
+    const remapped = mapRowToPolicy(row);
+    expect(remapped.premiumPayingTerm).toBe(7);
+    expect(remapped.policyTermYears).toBe(15);
+    expect(remapped.durationYears).toBe(7);
+
+    // Legacy row with only duration_years (fallback behavior)
+    const legacyRow = {
+      id: 'leg-1',
+      policy_name: 'Old LIC Policy',
+      duration_years: 12,
+      premium_amount: 10000,
+    };
+    const mappedLegacy = mapRowToPolicy(legacyRow);
+    expect(mappedLegacy.premiumPayingTerm).toBe(12);
+    expect(mappedLegacy.policyTermYears).toBe(12);
+    expect(mappedLegacy.durationYears).toBe(12);
   });
 
   it('maps payment rows bidirectional', () => {
@@ -804,6 +1058,15 @@ describe('Model Mappings (camelCase <-> snake_case)', () => {
       const lifeNextDueDate = '2025-08-15';
       expect(lifeDuration).toBe('15');
       expect(lifeNextDueDate).toBe('2025-08-15');
+    });
+
+    it('shows premium paying term and policy term only for Life and Term insurance (hidden for Health and Vehicle)', () => {
+      expect(hasPolicyTerms('Life Insurance')).toBe(true);
+      expect(hasPolicyTerms('Term Insurance')).toBe(true);
+      expect(hasPolicyTerms('Health Insurance')).toBe(false);
+      expect(hasPolicyTerms('Vehicle Insurance')).toBe(false);
+      expect(hasPolicyTerms('Motor Insurance')).toBe(false);
+      expect(hasPolicyTerms('Mediclaim')).toBe(false);
     });
 
     it('stores and retrieves IDV correctly in database row mapping without dropping sum_assured', () => {

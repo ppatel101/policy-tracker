@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   filterChipText: {
     ...typography.captionBold,
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 10,
   },
   filterChipTextActive: {
     color: colors.textInverse,

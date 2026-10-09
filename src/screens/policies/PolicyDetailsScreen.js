@@ -530,9 +530,16 @@ export const PolicyDetailsScreen = ({ route, navigation }) => {
                 </View>
 
                 <View style={styles.gridItem}>
-                  <Text style={styles.gridLabel}>Total Term</Text>
+                  <Text style={styles.gridLabel}>Policy Term</Text>
                   <Text style={styles.gridValue}>
-                    {policy.durationYears} {policy.durationYears === 1 ? 'Year' : 'Years'}
+                    {policy.policyTermYears || policy.durationYears} {Number(policy.policyTermYears || policy.durationYears) === 1 ? 'Year' : 'Years'}
+                  </Text>
+                </View>
+
+                <View style={styles.gridItem}>
+                  <Text style={styles.gridLabel}>Paying Term</Text>
+                  <Text style={styles.gridValue}>
+                    {policy.premiumPayingTerm || policy.durationYears} {Number(policy.premiumPayingTerm || policy.durationYears) === 1 ? 'Year' : 'Years'}
                   </Text>
                 </View>
               </View>
@@ -698,8 +705,12 @@ export const PolicyDetailsScreen = ({ route, navigation }) => {
             <Input
               label="Renewal Premium (₹)"
               value={renewalPremium}
-              onChangeText={setRenewalPremium}
+              onChangeText={(t) => {
+                const cleaned = t.replace(/[^0-9]/g, '').slice(0, 8);
+                setRenewalPremium(cleaned);
+              }}
               keyboardType="numeric"
+              maxLength={8}
               placeholder="e.g. 18500"
               leftIcon={<Text style={styles.currencyPrefix}>₹</Text>}
               required
@@ -848,8 +859,8 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     fontWeight: '600',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 10,
+    lineHeight: 14,
     marginTop: 2,
   },
   widgetValue: {
@@ -866,7 +877,7 @@ const styles = StyleSheet.create({
   widgetSubtext: {
     ...typography.caption,
     color: colors.textMuted,
-    fontSize: 11,
+    fontSize: 10,
     marginTop: 2,
   },
   card: {
@@ -976,7 +987,7 @@ const styles = StyleSheet.create({
   scheduleToggleText: {
     ...typography.captionBold,
     color: colors.primaryDark,
-    fontSize: 12,
+    fontSize: 10,
   },
   scheduleContent: {
     marginTop: spacing.sm,
@@ -1169,12 +1180,12 @@ const styles = StyleSheet.create({
   memberAgeText: {
     ...typography.caption,
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 10,
   },
   memberIdText: {
     ...typography.caption,
     color: colors.textMuted,
-    fontSize: 11,
+    fontSize: 10,
   },
   emptyMembersCard: {
     padding: spacing.xl,
@@ -1294,6 +1305,6 @@ const styles = StyleSheet.create({
   currencyPrefix: {
     ...typography.bodyBold,
     color: colors.primary,
-    fontSize: 16,
+    fontSize: 14,
   },
 });

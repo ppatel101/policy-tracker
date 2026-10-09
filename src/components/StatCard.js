@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   titleCompact: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   iconContainer: {
@@ -110,9 +110,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.xxs,
   },
   valueCompact: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    lineHeight: 24,
+    lineHeight: 22,
     marginTop: 0,
   },
   subtitle: {

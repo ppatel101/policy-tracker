@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   fyBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: colors.primaryDark,
   },
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
   seeAllText: {
     ...typography.bodyBold,
     color: colors.primary,
-    fontSize: 13,
+    fontSize: 11,
     marginTop: 4,
   },
   paymentsList: {

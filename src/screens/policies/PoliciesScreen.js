@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   sortButtonText: {
     ...typography.captionBold,
     color: colors.textPrimary,
-    fontSize: 11,
+    fontSize: 10,
   },
   activeFilterRow: {
     flexDirection: 'row',
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
   activeFilterText: {
     ...typography.captionBold,
     color: colors.primaryDark,
-    fontSize: 12,
+    fontSize: 10,
   },
   clearFiltersBtn: {
     flexDirection: 'row',
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   clearFiltersBtnText: {
     ...typography.captionBold,
     color: colors.danger,
-    fontSize: 11,
+    fontSize: 10,
   },
   listContent: {
     padding: spacing.lg,

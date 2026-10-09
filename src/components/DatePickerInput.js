@@ -235,7 +235,11 @@ export const DatePickerInput = ({
         </View>
 
         <View style={styles.rightIconContainer}>
-          <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+          {disabled ? (
+            <Ionicons name="lock-closed-outline" size={16} color={colors.textMuted} />
+          ) : (
+            <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+          )}
         </View>
       </TouchableOpacity>
 
@@ -434,7 +438,6 @@ const styles = StyleSheet.create({
   dateTextMain: {
     ...typography.bodyBold,
     color: colors.textPrimary,
-    fontSize: 14,
   },
   placeholderText: {
     ...typography.body,
@@ -551,7 +554,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 10,
   },
   calGrid: {
     flexDirection: 'row',
@@ -574,7 +577,7 @@ const styles = StyleSheet.create({
   },
   calCellText: {
     ...typography.body,
-    fontSize: 13,
+    fontSize: 11,
     color: colors.textPrimary,
   },
   calCellTextSelected: {
@@ -587,7 +590,7 @@ const styles = StyleSheet.create({
   },
   calCellTextMuted: {
     ...typography.body,
-    fontSize: 13,
+    fontSize: 11,
     color: colors.borderDark,
   },
   calFooter: {
@@ -606,7 +609,7 @@ const styles = StyleSheet.create({
   calTodayBtnText: {
     ...typography.bodyBold,
     color: colors.primary,
-    fontSize: 13,
+    fontSize: 11,
   },
   calCloseBtn: {
     paddingVertical: spacing.xs,
@@ -615,6 +618,6 @@ const styles = StyleSheet.create({
   calCloseBtnText: {
     ...typography.body,
     color: colors.textMuted,
-    fontSize: 13,
+    fontSize: 11,
   },
 });

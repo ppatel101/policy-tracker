@@ -189,37 +189,81 @@ export function calculateRemainingDuration(endDate, referenceDate = new Date()) 
 }
 
 /**
- * Calculate policy end date given start date and duration in years
+ * Calculate policy end date given start date and policy term in years
+ * End date is calculated based on policy term (e.g. 2020-10-08 with 10 years policy term -> 2030-10-08)
  * @param {Date|string} startDate
- * @param {number} durationYears
+ * @param {number} policyTermYears
  * @returns {string} YYYY-MM-DD
  */
-export function calculateEndDate(startDate, durationYears = 1) {
+export function calculateEndDate(startDate, policyTermYears = 1) {
   if (!startDate) return '';
   const d = new Date(startDate);
   if (isNaN(d.getTime())) return '';
-  const years = parseInt(durationYears, 10) || 1;
+  const years = parseInt(policyTermYears, 10) || 1;
   d.setFullYear(d.getFullYear() + years);
   return formatDate(d);
 }
 
 /**
+ * Calculate next due date from start date and payment frequency
+ * (e.g. for yearly: 1 year after start date, e.g. 2020-10-08 -> 2021-10-08; half-yearly: 6 months after start date)
+ * @param {Date|string} startDate
+ * @param {string} frequency - 'yearly' | 'half-yearly' | 'quarterly' | 'monthly'
+ * @returns {string} YYYY-MM-DD
+ */
+export function calculateNextDueDate(startDate, frequency = 'yearly') {
+  if (!startDate) return '';
+  const d = new Date(startDate);
+  if (isNaN(d.getTime())) return '';
+
+  const startDay = d.getDate();
+  let intervalMonths = 12;
+  switch ((frequency || '').toLowerCase()) {
+    case 'monthly':
+      intervalMonths = 1;
+      break;
+    case 'quarterly':
+      intervalMonths = 3;
+      break;
+    case 'half-yearly':
+      intervalMonths = 6;
+      break;
+    case 'yearly':
+    default:
+      intervalMonths = 12;
+      break;
+  }
+
+  d.setMonth(d.getMonth() + intervalMonths);
+  if (d.getDate() !== startDay) {
+    d.setDate(0); // adjust for end-of-month overflow (e.g. 31 Jan -> 28 Feb)
+  }
+  return formatDate(d);
+}
+
+/**
  * Generate schedule of future payments for a policy
+ * Installment count is based on Premium Paying Term (PPT)
  * @param {object} policy
  * @param {string} policy.startDate
  * @param {string} [policy.endDate]
- * @param {number} policy.durationYears
+ * @param {number} [policy.durationYears] - Premium paying term (years)
+ * @param {number} [policy.premiumPayingTerm] - Premium paying term (years)
+ * @param {number} [policy.policyTermYears] - Policy term (years)
  * @param {string} policy.paymentFrequency - 'monthly'|'quarterly'|'half-yearly'|'yearly'
  * @param {number} policy.premiumAmount
  * @param {string} [policy.id]
  * @param {string} [policy.userId]
+ * @param {Date|string} [referenceDate]
  * @returns {Array<object>}
  */
-export function generatePaymentSchedule(policy) {
+export function generatePaymentSchedule(policy, referenceDate = new Date()) {
   const {
     startDate,
     endDate: explicitEndDate,
     durationYears = 1,
+    premiumPayingTerm,
+    policyTermYears,
     paymentFrequency = 'yearly',
     premiumAmount = 0,
     id: policyId,
@@ -231,10 +275,11 @@ export function generatePaymentSchedule(policy) {
   const start = new Date(startDate);
   if (isNaN(start.getTime())) return [];
 
-  const years = parseInt(durationYears, 10) || 1;
+  const ppt = parseInt(premiumPayingTerm || durationYears, 10) || 1;
+  const policyTerm = parseInt(policyTermYears || policy.policyTerm || durationYears, 10) || ppt;
   const calculatedEndDate = explicitEndDate
     ? new Date(explicitEndDate)
-    : new Date(new Date(startDate).setFullYear(start.getFullYear() + years));
+    : new Date(new Date(startDate).setFullYear(start.getFullYear() + policyTerm));
 
   let intervalMonths = 12;
   let perYear = 1;
@@ -259,9 +304,10 @@ export function generatePaymentSchedule(policy) {
       break;
   }
 
-  const totalInstallments = years * perYear;
+  const totalInstallments = ppt * perYear;
   const schedule = [];
   const startDay = start.getDate();
+  const refDate = referenceDate ? new Date(referenceDate) : new Date();
 
   for (let i = 0; i < totalInstallments; i++) {
     const installmentDate = new Date(start);
@@ -277,21 +323,22 @@ export function generatePaymentSchedule(policy) {
     }
 
     // Do not generate payments strictly past policy end date
-    if (installmentDate.getTime() > calculatedEndDate.getTime()) {
+    if (startOfDay(installmentDate).getTime() > startOfDay(calculatedEndDate).getTime()) {
       break;
     }
 
     const formattedDueDate = formatDate(installmentDate);
+    const isPast = startOfDay(installmentDate).getTime() < startOfDay(refDate).getTime();
 
     schedule.push({
       policyId: policyId || null,
       userId: userId || null,
       installmentNumber: i + 1,
       dueDate: formattedDueDate,
-      paidDate: null,
+      paidDate: isPast ? formattedDueDate : null,
       amount: Number(premiumAmount),
-      paidAmount: null,
-      status: PAYMENT_STATUSES.UPCOMING,
+      paidAmount: isPast ? Number(premiumAmount) : null,
+      status: isPast ? PAYMENT_STATUSES.PAID : PAYMENT_STATUSES.UPCOMING,
       note: `Installment ${i + 1} of ${totalInstallments}`,
     });
   }

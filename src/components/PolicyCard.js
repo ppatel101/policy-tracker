@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     ...typography.subtitle,
     color: colors.textPrimary,
     fontWeight: '600',
-    fontSize: 13,
+    fontSize: 11,
   },
   sumAssuredValue: {
     color: colors.success,
@@ -193,6 +193,6 @@ const styles = StyleSheet.create({
   tagText: {
     ...typography.captionBold,
     color: colors.primaryDark,
-    fontSize: 11,
+    fontSize: 10,
   },
 });
